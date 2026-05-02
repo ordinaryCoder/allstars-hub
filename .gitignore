@@ -1,0 +1,24 @@
+# Dependencies
+node_modules
+.pnpm-debug.log*
+
+# Environment Variables (Crucial for security)
+.env
+.env.*
+!.env.example
+
+# Build outputs
+dist
+build
+.next/
+out/
+
+# IDE & OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Supabase local files
+/packages/supabase/migrations/
+/packages/supabase/.temp/
