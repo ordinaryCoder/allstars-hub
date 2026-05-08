@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-// Ensure this matches the name in /packages/database/package.json
-import { getTenantDb } from 'database'; 
+import { getTenantDb } from '@packages/database';
+import { verifySupabaseToken } from '@/lib/supabase';
 
 export async function GET(request: Request) {
   try {
@@ -11,7 +11,10 @@ export async function GET(request: Request) {
     }
 
     const token = authHeader.split(' ')[1];
-    
+
+    // VERIFY FIRST! Stop fake tokens here.
+    await verifySupabaseToken(token);
+
     // Initialize secure Prisma client
     const db = getTenantDb(token);
     
