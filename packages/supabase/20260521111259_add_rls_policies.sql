@@ -1,3 +1,5 @@
+
+
 -- 1. Helper
 CREATE OR REPLACE FUNCTION current_academy_id() RETURNS uuid AS $$
   SELECT NULLIF(current_setting('request.jwt.claims', true)::jsonb ->> 'academy_id', '')::uuid;

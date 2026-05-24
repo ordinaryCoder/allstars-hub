@@ -155,4 +155,4 @@ apps/web/
 ├── lib/
 │   ├── supabase/         # client.ts, server.ts, middleware.ts
 │   └── utils.ts
-└── middleware.ts         # Protect routes
+└── proxy.ts         # refresh session
