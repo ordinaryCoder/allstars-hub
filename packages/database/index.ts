@@ -1,10 +1,32 @@
 import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from "@prisma/adapter-pg";
+import { Pool } from 'pg';
+import { env } from "prisma/config";
+// import * as dotenv from "dotenv";
+// import * as path from "path";
+
+// Explicitly load the .env file from the monorepo root
+// dotenv.config({ path: path.resolve(process.cwd(), "../../.env") });
+// Fallback to local .env if it exists in the database package
+// dotenv.config();
+
+const databaseUrl = env("DATABASE_URL");
+
+if (!databaseUrl) {
+  throw new Error("DATABASE_URL is missing. Next.js is not loading the monorepo root .env file.");
+}
+
+const pool = new Pool({
+  connectionString: databaseUrl,
+});
+
+const adapter = new PrismaPg(pool);
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
-export const prisma = globalForPrisma.prisma ?? new PrismaClient();
+export const prisma = globalForPrisma.prisma ?? new PrismaClient({ adapter });
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 

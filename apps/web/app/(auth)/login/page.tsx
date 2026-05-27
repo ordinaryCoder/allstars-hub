@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { createClient } from '../../../lib/client';
 import { AcademyLogo, GoogleIcon, VisibilityIcon, VisibilityOffIcon } from '../../../components/ui/icons';
 import { login } from './action';
 
@@ -44,7 +43,7 @@ export default function LoginPage() {
 
       {/* Auth Container */}
       <main className="w-full max-w-md mx-auto bg-white shadow-xl border border-black/10 rounded-2xl p-6 sm:p-10">
-        <form onSubmit={handleLogin} className="flex flex-col gap-4">
+        <form onSubmit={handleLogin} method="POST" className="flex flex-col gap-4">
           {/* Email Input */}
           <div className="flex flex-col gap-1">
             <label className="text-sm font-medium text-gray-900" htmlFor="email">Email Address</label>

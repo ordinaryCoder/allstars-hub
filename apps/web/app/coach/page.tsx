@@ -1,6 +1,6 @@
 import { createClient } from '../../lib/server';
 import { redirect } from 'next/navigation';
-import { prisma } from '../../../../packages/database';
+import { requireRole } from '../../lib/dal';
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -11,34 +11,25 @@ export default async function DashboardPage() {
     redirect('/login');
   }
 
-  // Query role from UserAcademyRole table
-  const userRole = await prisma.userAcademyRole.findFirst({
-    where: { user_id: user.id },
-    select: { permissions: true }
-  });
-
-  if (!userRole) {
-    // No role found, handle error or onboarding
-    redirect('/login?error=no_role');
-  }
+  await requireRole(user.id, 'coach');
   // if (!userRole) {
   //   redirect('/onboarding'); // No role = need setup
   // }
 
-  const perms = userRole.permissions as string[];
+  // const perms = userRole.permissions as string[];
 
   // Routing logic based on permissions
-  if (perms.includes('admin')) {
-    redirect('/admin');
-  }
+  // if (perms.includes('admin')) {
+  //   redirect('/admin');
+  // }
 
-  if (perms.includes('coach')) {
-    redirect('/coach');
-  }
+  // if (perms.includes('coach')) {
+  //   redirect('/coach');
+  // }
 
-  if (!user) {
-    redirect('/login');
-  }
+  // if (!user) {
+  //   redirect('/login');
+  // }
 
   // Default fallback
   // redirect('/login');

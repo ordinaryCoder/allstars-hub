@@ -1,7 +1,7 @@
-import { createServerClient } from '@supabase/ssr'
-import { NextResponse, type NextRequest } from 'next/server'
+import { createServerClient, type CookieOptions } from '@supabase/ssr'
+import { NextResponse, type NextRequest, type MiddlewareConfig } from 'next/server'
 
-export async function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest): Promise<NextResponse> {
   let supabaseResponse = NextResponse.next({
     request,
   })
@@ -14,7 +14,10 @@ export async function proxy(request: NextRequest) {
         getAll() {
           return request.cookies.getAll()
         },
-        setAll(cookiesToSet, headers) {
+      setAll(
+        cookiesToSet: { name: string; value: string; options?: CookieOptions }[], 
+        headers?: Record<string, string>
+      ) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
           supabaseResponse = NextResponse.next({
             request,
@@ -38,23 +41,9 @@ export async function proxy(request: NextRequest) {
 
   // If the user is not signed in and they are trying to access a protected route,
   // redirect them to the login page.
-  if (!user && request.nextUrl.pathname !== '/login') {
+  if (!user && !request.nextUrl.pathname.startsWith('/login')) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
-    const redirectResponse = NextResponse.redirect(url)
-    
-    // IMPORTANT: Copy cookies over so the session isn't lost
-    supabaseResponse.cookies.getAll().forEach((cookie) => {
-      redirectResponse.cookies.set(cookie.name, cookie.value)
-    })
-    return redirectResponse
-  }
-
-  // If the user is signed in and they are trying to access the login page,
-  // redirect them to the dashboard.
-  if (user && request.nextUrl.pathname.startsWith('/login')) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/'
     const redirectResponse = NextResponse.redirect(url)
     
     // IMPORTANT: Copy cookies over so the session isn't lost
@@ -67,7 +56,7 @@ export async function proxy(request: NextRequest) {
   return supabaseResponse
 }
 
-export const config = {
+export const config: MiddlewareConfig = {
   matcher: [
     /*
      * Match all request paths except for the ones starting with:
