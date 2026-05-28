@@ -7,6 +7,12 @@ datasource db {
   provider = "postgresql"
 }
 
+enum ApprovalStatus {
+  PENDING
+  ACTIVE
+  INACTIVE
+}
+
 model Academy {
   id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name       String
@@ -14,37 +20,38 @@ model Academy {
   created_at DateTime @default(now()) @db.Timestamptz
 
   users_roles UserAcademyRole[]
-  locations    Location[]
-  sports       Sport[]
-  batches      Batch[]
-  players      Player[]
-  sessions     Session[]
-  attendance   Attendance[]
+  locations   Location[]
+  sports      Sport[]
+  batches     Batch[]
+  players     Player[]
+  sessions    Session[]
+  attendance  Attendance[]
 
   @@map("academies")
 }
 
 model User {
-  id            String   @id @db.Uuid
-  email         String   @unique
+  id            String         @id @db.Uuid
+  email         String         @unique
   first_name    String
   last_name     String
   mobile_number String?
-  created_at    DateTime @default(now()) @db.Timestamptz
+  status        ApprovalStatus @default(PENDING)
+  created_at    DateTime       @default(now()) @db.Timestamptz
 
-  academy_roles UserAcademyRole[]
-  sessions_created Session[] @relation("CreatedBy")
-  attendance_marked Attendance[] @relation("MarkedBy")
-  parent_of      ParentPlayer[]
+  academy_roles     UserAcademyRole[]
+  sessions_created  Session[]         @relation("CreatedBy")
+  attendance_marked Attendance[]      @relation("MarkedBy")
+  parent_of         ParentPlayer[]
 
   @@map("users")
 }
 
 model UserAcademyRole {
-  id         String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  user_id    String @db.Uuid
-  academy_id String @db.Uuid
-  permissions Json   // e.g. ["admin", "coach"]
+  id          String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id     String @db.Uuid
+  academy_id  String @db.Uuid
+  permissions Json   // e.g. ["admin", "coach", "parent", "player"]
 
   user    User    @relation(fields: [user_id], references: [id])
   academy Academy @relation(fields: [academy_id], references: [id])
