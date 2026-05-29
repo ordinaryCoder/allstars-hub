@@ -1,3 +1,9 @@
 packages:
   - 'apps/*'
   - 'packages/*'
+
+# Block prisma from creeping into the global workspace root
+hoistPattern:
+  - "!*prisma*"
+publicHoistPattern:
+  - "!*prisma*"

@@ -2,13 +2,13 @@ import { PrismaClient } from './generated/prisma';
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from 'pg';
 import { env } from "prisma/config";
-// import * as dotenv from "dotenv";
-// import * as path from "path";
+import * as dotenv from "dotenv";
+import * as path from "path";
 
 // Explicitly load the .env file from the monorepo root
-// dotenv.config({ path: path.resolve(process.cwd(), "../../.env") });
+dotenv.config({ path: path.resolve(process.cwd(), "../../.env") });
 // Fallback to local .env if it exists in the database package
-// dotenv.config();
+dotenv.config();
 
 const databaseUrl = env("DATABASE_URL");
 

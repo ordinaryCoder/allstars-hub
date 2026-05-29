@@ -7,12 +7,7 @@
         "allowSyntheticDefaultImports": true,
         "strict": true,
         "skipLibCheck": true,
-        "baseUrl": ".",
-        "paths": {
-            ".prisma/client/*": [
-                "../../node_modules/.pnpm/@prisma+client@7.8.0_prisma_8619248c2409e668e9f86cd42d38c435/node_modules/@prisma/client/*"
-            ]
-        }
+        "baseUrl": "."
     },
     "include": [
         "prisma/seed.ts",
