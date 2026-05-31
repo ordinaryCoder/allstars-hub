@@ -101,7 +101,7 @@ export default function LoginPage() {
           </div>
 
           {/* Primary Login Button */}
-          <button type="submit" disabled={pending} className="mt-6 w-full h-14 bg-black text-white rounded-xl font-semibold text-lg hover:opacity-90 hover:shadow-md active:scale-[0.98] transition-all flex items-center justify-center shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
+            <button type="submit" disabled={pending} className="mt-6 w-full h-14 bg-black text-white rounded-xl font-semibold text-lg hover:opacity-90 hover:shadow-md active:scale-[0.98] transition-all flex items-center justify-center shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
             Log In
           </button>
 
