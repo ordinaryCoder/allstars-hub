@@ -3,57 +3,32 @@
 import { createClient } from '../../../lib/server'
 import { redirect } from 'next/navigation'
 
-// 1. Define your valid roles and paths as strict TypeScript types
 type UserRole = 'coach' | 'admin' | 'player' | 'parent';
-type RedirectPath = '/coach' | '/admin' | '/dashboard' | '/unauthorized' | '/player' | '/parent' | null;
+type RedirectPath = '/coach' | '/admin' | '/dashboard' | '/unauthorized' | '/player' | '/parent' | '/pending' | null;
 
-export async function getTargetRouteForUser(userId: string): Promise<RedirectPath> {
-  const supabase = await createClient()
 
-  const { data: rolesData } = await supabase
-    .from('user_academy_roles')
-    .select('permissions')
-    .eq('user_id', userId)
+// Todo: remove google signup/login 
+// export async function loginWithGoogle(): Promise<void> {
+//   const supabase = await createClient()
 
-  const roles = rolesData?.map(r => r.permissions) || []
-  // 3. Flatten and filter down to a strictly typed string array
-  const cleanRoles: UserRole[] = Array.isArray(roles)
-  ? (roles.flat().filter((role): role is UserRole => typeof role === 'string'))
-  : [];
+//   // Requires callback route to exchange token
+//   const { data, error } = await supabase.auth.signInWithOAuth({
+//     provider: 'google',
+//     options: {
+//       redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/api/auth/callback`,
+//     },
+//   })
 
-  if (cleanRoles.includes("coach")) {
-    return '/coach' // Handles Coach only OR Admin+Coach
-  } else if (cleanRoles.includes('admin')) {
-    return '/admin' // Handles Admin only
-  }
-  else if (cleanRoles.includes('player') || cleanRoles.includes('parent')) {
-    return '/player' // Handles Player/Parent
-  }
+//   if (error) {
+//     return redirect('/login?error=Google login failed')
+//   }
 
-  return '/unauthorized' // Default for unauthorized-user with no/invalid roles
-}
+//   if (data.url) {
+//     redirect(data.url)
+//   }
+// }
 
-export async function loginWithGoogle(): Promise<void> {
-  const supabase = await createClient()
-
-  // Requires callback route to exchange token
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: 'google',
-    options: {
-      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/api/auth/callback`,
-    },
-  })
-
-  if (error) {
-    return redirect('/login?error=Google login failed')
-  }
-
-  if (data.url) {
-    redirect(data.url)
-  }
-}
-
-export async function login(formData: FormData): Promise<void> {
+export async function login(prevState: any, formData: FormData): Promise<{ error: string } | void> {
   const supabase = await createClient()
 
   const email = formData.get('email') as string
@@ -64,11 +39,35 @@ export async function login(formData: FormData): Promise<void> {
     password,
   })
 
-  if (authError || !authData.user) {
-    return redirect('/login?error=Could not authenticate user')
+  if (authError || !authData.session) {
+    return { error: 'Invalid username or password' }
   }
 
-  const targetRoute = await getTargetRouteForUser(authData.user.id)
+  // Custom claims injected by the hook are stored in the JWT payload, not the user object
+  const jwt = authData.session.access_token;
+  const payload = JSON.parse(Buffer.from(jwt.split('.')[1], 'base64').toString('utf-8'));
 
-  redirect(targetRoute || `/unauthorized?email=${encodeURIComponent(authData.user.email!)}`) // Fallback for type safety
+  const status = payload.status;
+  const roles = payload.roles || [];
+
+  if (!status || status === 'PENDING') {
+    // await supabase.auth.signOut()
+    return redirect(`/pending?email=${encodeURIComponent(authData.user.email ?? '')}`)
+  }
+
+  if (status !== 'ACTIVE') {
+    await supabase.auth.signOut()
+    return redirect(`/unauthorized?email=${encodeURIComponent(authData.user.email ?? '')}`)
+  }
+
+  const cleanRoles: UserRole[] = Array.isArray(roles)
+    ? (roles.filter((role): role is UserRole => typeof role === 'string'))
+    : [];
+
+  let targetRoute: RedirectPath = '/unauthorized';
+  if (cleanRoles.includes('coach')) targetRoute = '/coach';
+  else if (cleanRoles.includes('admin')) targetRoute = '/admin';
+  else if (cleanRoles.includes('player') || cleanRoles.includes('parent')) targetRoute = '/player';
+
+  redirect(targetRoute)
 }

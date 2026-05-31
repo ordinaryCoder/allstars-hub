@@ -1,6 +1,7 @@
 import { createClient } from '../../lib/server';
 import { redirect } from 'next/navigation';
 import { requireRole } from '../../lib/dal';
+import { ACADEMY_NAME } from '@/lib/constant';
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -76,7 +77,7 @@ function TopAppBar({ userName, onSignOut }: { userName: string, onSignOut: () =>
         </div>
         <div className="flex flex-col">
           <span className="font-semibold text-base text-slate-900 capitalize">{userName}</span>
-          <span className="text-[10px] text-slate-500 font-bold tracking-wider uppercase">Elite Academy</span>
+          <span className="text-[10px] text-slate-500 font-bold tracking-wider uppercase">{ACADEMY_NAME}</span>
         </div>
       </div>
       <form action={onSignOut}>

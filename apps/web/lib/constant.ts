@@ -1,0 +1,1 @@
+export const ACADEMY_NAME = 'AllStars Academy';

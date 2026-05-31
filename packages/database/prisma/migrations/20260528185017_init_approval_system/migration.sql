@@ -272,3 +272,47 @@ CREATE POLICY "Tenant Isolation: users" ON users
     )
   )
   WITH CHECK (id = (SELECT COALESCE(current_setting('request.jwt.claims', true)::jsonb ->> 'sub', '00000000-0000-0000-0000-000000000000'))::uuid);
+
+-- =======================================================
+-- SUPABASE CUSTOM ACCESS TOKEN HOOK
+-- =======================================================
+
+CREATE OR REPLACE FUNCTION public.custom_access_token_hook(event jsonb)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    claims jsonb;
+    user_status "ApprovalStatus";
+    user_permissions jsonb;
+    user_academy_id uuid;
+BEGIN
+    -- Fetch user status and role data
+    SELECT status INTO user_status FROM users WHERE id = (event->>'user_id')::uuid;
+    
+    SELECT academy_id, permissions INTO user_academy_id, user_permissions
+    FROM user_academy_roles 
+    WHERE user_id = (event->>'user_id')::uuid 
+    LIMIT 1;
+
+    claims := event->'claims';
+
+    IF user_status IS NOT NULL THEN
+        claims := jsonb_set(claims, '{status}', to_jsonb(user_status));
+    END IF;
+    IF user_academy_id IS NOT NULL THEN
+        claims := jsonb_set(claims, '{academy_id}', to_jsonb(user_academy_id));
+    END IF;
+    IF user_permissions IS NOT NULL THEN
+        claims := jsonb_set(claims, '{roles}', user_permissions);
+    END IF;
+
+    RETURN jsonb_set(event, '{claims}', claims);
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.custom_access_token_hook(jsonb) TO supabase_auth_admin;
+REVOKE ALL ON FUNCTION public.custom_access_token_hook(jsonb) FROM PUBLIC;
+GRANT USAGE ON SCHEMA public TO supabase_auth_admin;

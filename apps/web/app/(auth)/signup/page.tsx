@@ -1,12 +1,16 @@
 'use client';
 
 import { useState } from 'react';
-import { AcademyLogo, GoogleIcon, VisibilityIcon, VisibilityOffIcon } from '../../../components/ui/icons';
+import { signup } from './action';
+import { AcademyLogo, VisibilityIcon, VisibilityOffIcon } from '../../../components/ui/icons';
+import { ACADEMY_NAME } from '@/lib/constant';
+import { DobInput } from './DobInput';
 
 export default function SignupPage() {
   const [role, setRole] = useState('parent');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [guardianName, setGuardianName] = useState('');
   const [email, setEmail] = useState('');
   const [mobileNumber, setMobileNumber] = useState('');
   const [emergencyContact, setEmergencyContact] = useState('');
@@ -17,16 +21,12 @@ export default function SignupPage() {
   const handleSignup = async (e: any) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
+
     try {
-      console.log('Account creation triggered');
+      await signup(formData);
     } catch (err) {
       console.error(err);
     }
-  };
-
-  const handleGoogleSignup = async (e: any) => {
-    e.preventDefault();
-    // Handle Google signup here
   };
 
   return (
@@ -36,7 +36,7 @@ export default function SignupPage() {
         <div className="h-12 w-12 bg-gray-200 rounded-full mb-4 flex items-center justify-center overflow-hidden">
           <AcademyLogo className="w-6 h-6 text-gray-600" />
         </div>
-        <h1 className="text-2xl font-bold text-gray-900">Elite Academy</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{ACADEMY_NAME}</h1>
         <p className="text-sm text-gray-600 mt-2">Join our sports community to track your progress and attendance.</p>
       </header>
 
@@ -72,14 +72,25 @@ export default function SignupPage() {
             </div>
           </div>
 
+          {role === 'parent' && (
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium text-gray-900" htmlFor="guardianName">Guardian / Parent Name</label>
+              <input id="guardianName" name="guardianName" type="text" required value={guardianName} onChange={(e) => setGuardianName(e.target.value)} placeholder="Guardian full name" className="w-full h-12 px-4 bg-white border border-gray-300 rounded-xl text-base text-gray-900 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all" />
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-gray-900" htmlFor="firstName">First Name</label>
-              <input id="firstName" name="firstName" type="text" required value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="First name" className="w-full h-12 px-4 bg-white border border-gray-300 rounded-xl text-base text-gray-900 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all" />
+              <label className="text-sm font-medium text-gray-900" htmlFor="firstName">
+                {role === 'parent' ? 'Player First Name' : 'First Name'}
+              </label>
+              <input id="firstName" name="firstName" type="text" required value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder={role === 'parent' ? 'Player first name' : 'First name'} className="w-full h-12 px-4 bg-white border border-gray-300 rounded-xl text-base text-gray-900 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all" />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-gray-900" htmlFor="lastName">Last Name</label>
-              <input id="lastName" name="lastName" type="text" required value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Last name" className="w-full h-12 px-4 bg-white border border-gray-300 rounded-xl text-base text-gray-900 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all" />
+              <label className="text-sm font-medium text-gray-900" htmlFor="lastName">
+                {role === 'parent' ? 'Player Last Name' : 'Last Name'}
+              </label>
+              <input id="lastName" name="lastName" type="text" required value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder={role === 'parent' ? 'Player last name' : 'Last name'} className="w-full h-12 px-4 bg-white border border-gray-300 rounded-xl text-base text-gray-900 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all" />
             </div>
           </div>
 
@@ -90,20 +101,24 @@ export default function SignupPage() {
 
           <div className="flex flex-col gap-1">
             <label className="text-sm font-medium text-gray-900" htmlFor="mobileNumber">Mobile Number</label>
-            <input id="mobileNumber" name="mobileNumber" type="tel" required value={mobileNumber} onChange={(e) => setMobileNumber(e.target.value)} placeholder="+1 (555) 000-0000" className="w-full h-12 px-4 bg-white border border-gray-300 rounded-xl text-base text-gray-900 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all" />
+            <input id="mobileNumber" name="mobileNumber" type="tel" required value={mobileNumber} onChange={(e) => setMobileNumber(e.target.value)} className="w-full h-12 px-4 bg-white border border-gray-300 rounded-xl text-base text-gray-900 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all" />
           </div>
 
           {role === 'player' && (
             <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-gray-900" htmlFor="emergencyContact">Emergency Contact</label>
-              <input id="emergencyContact" name="emergencyContact" type="tel" required value={emergencyContact} onChange={(e) => setEmergencyContact(e.target.value)} placeholder="+1 (555) 000-0000" className="w-full h-12 px-4 bg-white border border-gray-300 rounded-xl text-base text-gray-900 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all" />
+              <label className="text-sm font-medium text-gray-900" htmlFor="emergencyContact">Emergency Contact Number</label>
+              <input id="emergencyContact" name="emergencyContact" type="tel" required value={emergencyContact} onChange={(e) => setEmergencyContact(e.target.value)} className="w-full h-12 px-4 bg-white border border-gray-300 rounded-xl text-base text-gray-900 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all" />
             </div>
           )}
 
-          <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium text-gray-900" htmlFor="dob">Date of Birth</label>
-            <input id="dob" name="dob" type="date" required value={dob} onChange={(e) => setDob(e.target.value)} className="w-full h-12 px-4 bg-white border border-gray-300 rounded-xl text-base text-gray-900 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all" />
-          </div>
+          <DobInput
+            id="dob"
+            name="dob"
+            label={role === 'parent' ? "Player's Date of Birth" : "Date of Birth"}
+            value={dob}
+            onChange={setDob}
+            required
+          />
 
           <div className="flex flex-col gap-1 mt-2">
             <label className="text-sm font-medium text-gray-900" htmlFor="password">Password</label>
@@ -117,21 +132,6 @@ export default function SignupPage() {
 
           <button type="submit" className="mt-4 w-full h-14 bg-black text-white rounded-xl font-semibold text-lg hover:opacity-90 hover:shadow-md active:scale-[0.98] transition-all flex items-center justify-center shadow-sm">
             Sign Up
-          </button>
-
-          <div className="flex items-center my-4">
-            <div className="flex-grow border-t border-gray-200"></div>
-            <span className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Or</span>
-            <div className="flex-grow border-t border-gray-200"></div>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleGoogleSignup}
-            className="w-full h-14 bg-white border border-gray-300 text-gray-900 rounded-xl font-semibold text-base hover:bg-gray-50 hover:shadow-md active:scale-[0.98] transition-all flex items-center justify-center gap-3 shadow-sm"
-          >
-            <GoogleIcon className="w-6 h-6" />
-            Continue with Google
           </button>
 
           <p className="mt-4 text-center text-sm text-gray-600">

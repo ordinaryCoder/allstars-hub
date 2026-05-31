@@ -1,37 +1,40 @@
 'use client';
 
-import { useState } from 'react';
-import { AcademyLogo, GoogleIcon, VisibilityIcon, VisibilityOffIcon } from '../../../components/ui/icons';
+import { useState, useActionState, useEffect } from 'react';
+import { AcademyLogo, VisibilityIcon, VisibilityOffIcon } from '../../../components/ui/icons';
 import { login } from './action';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  // const supabase = createClient();
+  const [shake, setShake] = useState(false);
 
-  const handleLogin = async (e: any) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget); // Get data
-    try {
-      await login(formData); // Async work here
-    } catch (err) {
-      console.error(err);
-    }
-  };
+  const [state, action, pending] = useActionState(login, undefined);
 
-  const handleGoogleLogin = async (e: any) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget); // Get data
-    try {
-      await login(formData); // Async work here
-    } catch (err) {
-      console.error(err);
+  useEffect(() => {
+    if (state?.error) {
+      setShake(true);
+      const timer = setTimeout(() => setShake(false), 400);
+      return () => clearTimeout(timer);
     }
-  };
+  }, [state?.error]);
 
   return (
     <div className="bg-gray-50 text-gray-900 antialiased min-h-screen flex flex-col items-center justify-center p-4 sm:p-8">
+      {pending && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/60 backdrop-blur-sm transition-all duration-300">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-black"></div>
+        </div>
+      )}
+      <style>{`
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          20%, 60% { transform: translateX(-5px); }
+          40%, 80% { transform: translateX(5px); }
+        }
+        .animate-shake { animation: shake 0.4s ease-in-out; }
+      `}</style>
       {/* Top Area: Academy Logo Placeholder */}
       <header className="w-full max-w-md mb-8 flex flex-col items-center justify-center text-center">
         <div className="h-12 w-12 bg-gray-200 rounded-full mb-4 flex items-center justify-center overflow-hidden">
@@ -43,7 +46,12 @@ export default function LoginPage() {
 
       {/* Auth Container */}
       <main className="w-full max-w-md mx-auto bg-white shadow-xl border border-black/10 rounded-2xl p-6 sm:p-10">
-        <form onSubmit={handleLogin} method="POST" className="flex flex-col gap-4">
+        <form action={action} className="flex flex-col gap-4">
+          {state?.error && (
+            <div className={`p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl text-center font-medium ${shake ? 'animate-shake' : ''}`}>
+              {state.error}
+            </div>
+          )}
           {/* Email Input */}
           <div className="flex flex-col gap-1">
             <label className="text-sm font-medium text-gray-900" htmlFor="email">Email Address</label>
@@ -56,7 +64,8 @@ export default function LoginPage() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="coach@academy.com"
               aria-label="Email Address"
-              className="w-full h-14 px-4 bg-white border border-gray-300 rounded-xl text-base text-gray-900 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
+              disabled={pending}
+              className="w-full h-14 px-4 bg-white border border-gray-300 rounded-xl text-base text-gray-900 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all disabled:opacity-50 disabled:bg-gray-50"
             />
           </div>
 
@@ -76,13 +85,15 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 aria-label="Password"
-                className="w-full h-14 pl-4 pr-12 bg-white border border-gray-300 rounded-xl text-base text-gray-900 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
+                disabled={pending}
+                className="w-full h-14 pl-4 pr-12 bg-white border border-gray-300 rounded-xl text-base text-gray-900 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all disabled:opacity-50 disabled:bg-gray-50"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 aria-label="Toggle password visibility"
-                className="absolute right-2 top-1/2 -translate-y-1/2 w-12 h-12 flex items-center justify-center text-gray-500 hover:text-gray-900 focus:outline-none"
+                disabled={pending}
+                className="absolute right-2 top-1/2 -translate-y-1/2 w-12 h-12 flex items-center justify-center text-gray-500 hover:text-gray-900 focus:outline-none disabled:opacity-50"
               >
                 {showPassword ? <VisibilityIcon className="w-5 h-5" /> : <VisibilityOffIcon className="w-5 h-5" />}
               </button>
@@ -90,29 +101,12 @@ export default function LoginPage() {
           </div>
 
           {/* Primary Login Button */}
-          <button type="submit" className="mt-6 w-full h-14 bg-black text-white rounded-xl font-semibold text-lg hover:opacity-90 hover:shadow-md active:scale-[0.98] transition-all flex items-center justify-center shadow-sm">
+          <button type="submit" disabled={pending} className="mt-6 w-full h-14 bg-black text-white rounded-xl font-semibold text-lg hover:opacity-90 hover:shadow-md active:scale-[0.98] transition-all flex items-center justify-center shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
             Log In
           </button>
 
-          {/* Divider */}
-          <div className="flex items-center my-6">
-            <div className="flex-grow border-t border-gray-200"></div>
-            <span className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Or</span>
-            <div className="flex-grow border-t border-gray-200"></div>
-          </div>
-
-          {/* Secondary SSO Button */}
-          <button
-            type="button"
-            onClick={handleGoogleLogin}
-            className="w-full h-14 bg-white border border-gray-300 text-gray-900 rounded-xl font-semibold text-base hover:bg-gray-50 hover:shadow-md active:scale-[0.98] transition-all flex items-center justify-center gap-3 shadow-sm"
-          >
-            <GoogleIcon className="w-6 h-6" />
-            Continue with Google
-          </button>
-
           <p className="mt-6 text-center text-sm text-gray-600">
-            Don't have an account? <a href="#" className="text-black font-semibold hover:underline">Sign Up</a>
+            Don't have an account? <a href="/signup" className="text-black font-semibold hover:underline">Sign Up</a>
           </p>
         </form>
       </main>
