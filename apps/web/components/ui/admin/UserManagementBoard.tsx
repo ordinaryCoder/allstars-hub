@@ -186,16 +186,6 @@ export function UserManagementBoard({ pendingUsers, activeUsers, approveUser }: 
           </div>
         )}
       </div>
-
-      {/* FAB for Adding New User */}
-      <div 
-        className="fixed bottom-24 w-full max-w-[448px] pointer-events-none flex justify-end px-4 z-40" 
-        style={{ left: '50%', transform: 'translateX(-50%)' }}
-      >
-        <button className="w-14 h-14 bg-slate-900 text-white rounded-full shadow-lg flex items-center justify-center active:scale-90 transition-transform pointer-events-auto hover:bg-slate-800">
-          <span className="material-symbols-outlined text-[28px]">person_add</span>
-        </button>
-      </div>
     </div>
   );
 }

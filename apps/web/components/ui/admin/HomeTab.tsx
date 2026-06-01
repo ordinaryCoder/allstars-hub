@@ -1,11 +1,26 @@
-export function HomeTab() {
+import { prisma } from '../../../../../packages/database';
+import { QuickActions } from './QuickActions';
+
+export async function HomeTab() {
+  const activeUsers = await prisma.user.findMany({
+    where: { status: 'ACTIVE' },
+    include: { academy_roles: true },
+  });
+
+  const totalPlayers = activeUsers.filter((user: any) => {
+    const perms = user.academy_roles?.[0]?.permissions;
+    if (!perms) return false;
+    const permStr = Array.isArray(perms) ? perms.join(',').toLowerCase() : String(perms).toLowerCase();
+    return permStr.includes('parent') || permStr.includes('player');
+  }).length;
+
   return (
     <>
       {/* KPI Cards Grid */}
       <section className="grid grid-cols-3 gap-3">
         <div className="bg-white rounded-2xl p-3 shadow-sm border border-slate-100 flex flex-col items-center text-center">
           <span className="text-xs font-semibold text-slate-500 mb-1">Total Players</span>
-          <span className="text-3xl font-bold text-slate-900">248</span>
+          <span className="text-3xl font-bold text-slate-900">{totalPlayers}</span>
           <div className="flex items-center gap-1 text-emerald-500 mt-1">
             <span className="material-symbols-outlined text-[12px]">trending_up</span>
             <span className="text-[10px] font-bold">+5.2%</span>
@@ -95,30 +110,8 @@ export function HomeTab() {
         </div>
       </section>
 
-      {/* Quick Actions Grid */}
-      <section className="space-y-3">
-        <h2 className="text-lg font-bold text-slate-900 px-1">Quick Actions</h2>
-        <div className="grid grid-cols-3 gap-4">
-          <button className="bg-white hover:bg-slate-50 border border-slate-100 rounded-2xl p-4 shadow-sm flex flex-col items-center justify-center gap-2 transition-transform active:scale-95 min-h-[100px]">
-            <div className="w-10 h-10 rounded-full bg-slate-900 text-white flex items-center justify-center">
-              <span className="material-symbols-outlined">person_add</span>
-            </div>
-            <span className="text-xs font-semibold text-slate-900">Add Player</span>
-          </button>
-          <button className="bg-white hover:bg-slate-50 border border-slate-100 rounded-2xl p-4 shadow-sm flex flex-col items-center justify-center gap-2 transition-transform active:scale-95 min-h-[100px]">
-            <div className="w-10 h-10 rounded-full bg-slate-900 text-white flex items-center justify-center">
-              <span className="material-symbols-outlined">person_outline</span>
-            </div>
-            <span className="text-xs font-semibold text-slate-900">Add Coach</span>
-          </button>
-          <button className="bg-white hover:bg-slate-50 border border-slate-100 rounded-2xl p-4 shadow-sm flex flex-col items-center justify-center gap-2 transition-transform active:scale-95 min-h-[100px]">
-            <div className="w-10 h-10 rounded-full bg-slate-900 text-white flex items-center justify-center">
-              <span className="material-symbols-outlined">calendar_view_day</span>
-            </div>
-            <span className="text-xs font-semibold text-slate-900">Manage Batches</span>
-          </button>
-        </div>
-      </section>
+      {/* Quick Actions Integration */}
+      <QuickActions />
 
       {/* Recent Activity / Featured Card */}
       <section className="bg-slate-900 rounded-2xl p-5 shadow-md relative overflow-hidden min-h-[160px] flex flex-col justify-end">
