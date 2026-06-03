@@ -7,7 +7,7 @@ export async function requireRole(userId: string, requiredRole: string): Promise
 
   // Use the cached JWT to verify identity and roles instead of querying the DB
   if (!session || session.user.id !== userId) {
-    redirect('/login?error=unauthorized');
+    redirect('/login');
   }
 
   // Decode the JWT to access custom claims injected by the Postgres hook
@@ -15,6 +15,6 @@ export async function requireRole(userId: string, requiredRole: string): Promise
   const roles = jwtPayload.roles || [];
 
   if (!roles.includes(requiredRole)) {
-    redirect('/login?error=unauthorized');
+    redirect('/unauthorized');
   }
 }

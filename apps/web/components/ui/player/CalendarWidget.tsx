@@ -1,13 +1,22 @@
-export function CalendarWidget() {
+export function CalendarWidget({ monthName, attendanceMap }: { monthName: string; attendanceMap: Record<number, string> }) {
   const days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-  const pastDates = [25, 26, 27, 28, 29, 30]; // 29 was missing in original HTML, fixed here
-  const currentDates = Array.from({ length: 31 }, (_, i) => i + 1);
-  const futureDates = [1, 2, 3, 4, 5];
+  
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstDay = new Date(year, month, 1).getDay(); // 0 is Sun, 1 is Mon
+  const startOffset = firstDay === 0 ? 6 : firstDay - 1; // Mon=0..Sun=6
+  
+  const prevMonthDays = new Date(year, month, 0).getDate();
+  const pastDates = Array.from({ length: startOffset }, (_, i) => prevMonthDays - startOffset + i + 1);
+  const currentDates = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+  const futureDates = Array.from({ length: 42 - (pastDates.length + currentDates.length) }, (_, i) => i + 1);
 
   return (
     <section className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-bold text-slate-900">October 2023</h2>
+        <h2 className="text-lg font-bold text-slate-900">{monthName}</h2>
         <div className="flex gap-4">
           <span className="material-symbols-outlined text-slate-400 cursor-pointer">chevron_left</span>
           <span className="material-symbols-outlined text-slate-400 cursor-pointer">chevron_right</span>
@@ -21,10 +30,10 @@ export function CalendarWidget() {
       <div className="grid grid-cols-7 gap-y-2 gap-x-1">
         {pastDates.map((d, i) => <div key={`p-${i}`} className="h-9 flex items-center justify-center opacity-25 text-sm">{d}</div>)}
         {currentDates.map((d) => {
-          // Simulate the specific statuses from the HTML snippet
-          if (d === 19) return <div key={d} className="h-9 w-9 mx-auto flex items-center justify-center font-bold text-white bg-rose-500 rounded-full shadow-sm">{d}</div>;
-          if (d === 22 || d === 24) return <div key={d} className="h-9 w-9 mx-auto flex items-center justify-center font-bold text-white bg-emerald-500 rounded-full shadow-sm">{d}</div>;
-          if (d === 26) return <div key={d} className="h-9 w-9 mx-auto flex items-center justify-center font-bold text-white bg-amber-500 rounded-full shadow-sm">{d}</div>;
+          const status = attendanceMap[d];
+          if (status === 'Absent') return <div key={d} className="h-9 w-9 mx-auto flex items-center justify-center font-bold text-white bg-rose-500 rounded-full shadow-sm">{d}</div>;
+          if (status === 'Present') return <div key={d} className="h-9 w-9 mx-auto flex items-center justify-center font-bold text-white bg-emerald-500 rounded-full shadow-sm">{d}</div>;
+          if (status === 'Late') return <div key={d} className="h-9 w-9 mx-auto flex items-center justify-center font-bold text-white bg-amber-500 rounded-full shadow-sm">{d}</div>;
           return <div key={d} className="h-9 flex items-center justify-center text-sm">{d}</div>;
         })}
         {futureDates.map((d, i) => <div key={`f-${i}`} className="h-9 flex items-center justify-center opacity-25 text-sm">{d}</div>)}
