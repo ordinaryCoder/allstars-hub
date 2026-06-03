@@ -2,6 +2,8 @@
 
 import { prisma } from '../../../../packages/database';
 import { revalidatePath } from 'next/cache';
+import { signup } from '../(auth)/signup/action';
+import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 
 /**
  * Generates a secure temporary password.
@@ -12,50 +14,64 @@ function generateTempPassword() {
 }
 
 export async function addPlayerAdmin(formData: FormData) {
-  const email = formData.get('email')?.toString() || '';
-  const firstName = formData.get('firstName')?.toString() || '';
-  const lastName = formData.get('lastName')?.toString() || '';
-  const mobileNumber = formData.get('mobileNumber')?.toString() || '';
-  const role = formData.get('role')?.toString() || 'parent';
-  
-  const tempPassword = generateTempPassword();
-  // TODO: Use supabase.auth.admin.createUser({ email, password: tempPassword, email_confirm: true }) 
-  // here using your SUPABASE_SERVICE_ROLE_KEY to register them in auth as well.
-
-  await prisma.user.create({
-    data: {
-      email,
-      first_name: firstName,
-      last_name: lastName,
-      mobile_number: mobileNumber,
-      status: 'ACTIVE',
-      academy_roles: {
-        create: { permissions: [role] }
-      }
-    }
-  });
-
+  const res = await signup(formData, true);
+  if (res?.error) return { error: res.error };
   revalidatePath('/admin');
+  return { success: true };
 }
 
 export async function addCoachAdmin(formData: FormData) {
-  const email = formData.get('email')?.toString() || '';
-  const firstName = formData.get('firstName')?.toString() || '';
-  const lastName = formData.get('lastName')?.toString() || '';
-  const mobileNumber = formData.get('mobileNumber')?.toString() || '';
+  const email = formData.get('email')?.toString().trim() || '';
+  const firstName = formData.get('firstName')?.toString().trim() || '';
+  const lastName = formData.get('lastName')?.toString().trim() || '';
+  const mobileNumber = formData.get('mobileNumber')?.toString().trim() || '';
+
+  if (!email || !firstName || !lastName || !mobileNumber) {
+    return { error: 'Please fill in all required fields' };
+  }
+
+  const academy = await prisma.academy.findFirst({
+    where: { is_active: true },
+    select: { id: true },
+  });
+
+  if (!academy) {
+    return { error: 'No active academy available' };
+  }
+
+  const tempPassword = generateTempPassword();
+  const supabaseAdmin = createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  );
+
+  const { data: authData, error: authError } = await supabaseAdmin.auth.signUp({
+    email,
+    password: tempPassword,
+  });
+
+  if (authError || !authData?.user) {
+    return { error: authError?.message ?? 'Unable to create auth account for coach' };
+  }
 
   await prisma.user.create({
     data: {
+      id: authData.user.id,
       email,
       first_name: firstName,
       last_name: lastName,
       mobile_number: mobileNumber,
       status: 'ACTIVE',
       academy_roles: {
-        create: { permissions: ['coach'] }
+        create: { 
+          academy_id: academy.id,
+          permissions: ['coach'] 
+        }
       }
     }
   });
 
   revalidatePath('/admin');
+  return { success: true };
 }

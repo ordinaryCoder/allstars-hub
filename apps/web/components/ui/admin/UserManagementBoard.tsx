@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 
 // --- Types ---
 type User = any;
@@ -27,10 +27,10 @@ const getPrimaryRole = (user: User) => {
 };
 
 // --- Components ---
-function FilterDropdown({ 
-  value, 
-  onChange 
-}: { 
+function FilterDropdown({
+  value,
+  onChange
+}: {
   value: 'pending' | 'players' | 'coaches';
   onChange: (val: 'pending' | 'players' | 'coaches') => void;
 }) {
@@ -38,7 +38,7 @@ function FilterDropdown({
     <section className="relative group w-full max-w-full overflow-hidden mb-2">
       <label className="sr-only" htmlFor="user-filter">Filter Users</label>
       <div className="relative w-full max-w-full">
-        <select 
+        <select
           id="user-filter"
           value={value}
           onChange={(e) => onChange(e.target.value as any)}
@@ -122,6 +122,19 @@ export function UserManagementBoard({ pendingUsers, activeUsers, approveUser }: 
   const activePlayers = useMemo(() => activeUsers.filter(isParentOrPlayer), [activeUsers]);
   const activeCoaches = useMemo(() => activeUsers.filter(u => !isParentOrPlayer(u)), [activeUsers]);
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [viewMode, pageSize]);
+
+  const currentList = viewMode === 'pending' ? pendingUsers : viewMode === 'players' ? activePlayers : activeCoaches;
+  const totalRecords = currentList.length;
+  const totalPages = Math.max(1, Math.ceil(totalRecords / pageSize));
+  const startIndex = (currentPage - 1) * pageSize;
+  const paginatedList = currentList.slice(startIndex, startIndex + pageSize);
+
   return (
     <div className="flex flex-col gap-6 w-full relative">
       {/* Header Section */}
@@ -145,7 +158,7 @@ export function UserManagementBoard({ pendingUsers, activeUsers, approveUser }: 
                 No pending users found.
               </div>
             ) : (
-              pendingUsers.map(user => (
+              paginatedList.map(user => (
                 <PendingUserCard key={user.id} user={user} approveUser={approveUser} />
               ))
             )}
@@ -162,7 +175,7 @@ export function UserManagementBoard({ pendingUsers, activeUsers, approveUser }: 
                 No active players found.
               </div>
             ) : (
-              activePlayers.map(user => (
+              paginatedList.map(user => (
                 <ActiveUserCard key={user.id} user={user} />
               ))
             )}
@@ -179,13 +192,45 @@ export function UserManagementBoard({ pendingUsers, activeUsers, approveUser }: 
                 No active coaches found.
               </div>
             ) : (
-              activeCoaches.map(user => (
+              paginatedList.map(user => (
                 <ActiveUserCard key={user.id} user={user} isAdmin={getPermissionsStr(user).includes('admin')} />
               ))
             )}
           </div>
         )}
-      </div>
-    </div>
+
+        {/* Pagination Controls */}
+        {totalRecords > 0 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-2 pt-4 border-t border-slate-200">
+            <div className="flex items-center gap-2">
+              <label htmlFor="pageSize" className="text-[12px] font-medium text-slate-500">Rows per page:</label>
+              <div className="relative">
+                <select
+                  id="pageSize"
+                  value={pageSize}
+                  onChange={(e) => setPageSize(Number(e.target.value))}
+                  className="h-8 pl-2 pr-6 appearance-none bg-white border border-slate-200 rounded-lg text-[12px] font-medium text-slate-900 focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none cursor-pointer"
+                >
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+                <span className="material-symbols-outlined absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500 !text-[16px]">expand_more</span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-4 text-[12px] font-medium text-slate-500">
+              <span>
+                {startIndex + 1}-{Math.min(startIndex + pageSize, totalRecords)} of {totalRecords}
+              </span>
+              <div className="flex gap-1">
+                <button onClick={() => setCurrentPage(p => p - 1)} disabled={currentPage === 1} className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed text-slate-900 shadow-sm transition-all active:scale-95"><span className="material-symbols-outlined text-[18px]">chevron_left</span></button>
+                <button onClick={() => setCurrentPage(p => p + 1)} disabled={currentPage === totalPages} className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed text-slate-900 shadow-sm transition-all active:scale-95"><span className="material-symbols-outlined text-[18px]">chevron_right</span></button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div >
+    </div >
   );
 }

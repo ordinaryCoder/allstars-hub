@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { requireRole } from '../../lib/dal'
 import { prisma } from '../../../../packages/database'
 import { UserManagementBoard } from '../../components/ui/admin/UserManagementBoard'
-import { TopAppBar } from '../../components/ui/admin/TopAppBar'
+import { TopAppBar } from '../../components/ui/player/TopAppBar'
 import { HomeTab } from '../../components/ui/admin/HomeTab'
 import { BottomNavBar } from '../../components/ui/admin/BottomNavBar'
 

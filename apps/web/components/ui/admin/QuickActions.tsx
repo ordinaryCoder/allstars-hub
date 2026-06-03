@@ -2,18 +2,30 @@
 
 import { useState, useTransition } from 'react';
 import { addPlayerAdmin, addCoachAdmin } from '../../../app/admin/actions';
+import { DobInput } from '../../../app/(auth)/signup/DobInput';
+import { useSnackbar } from '../shared/Snackbar';
 
 export function QuickActions() {
   const [modal, setModal] = useState<'none' | 'player' | 'coach'>('none');
   const [role, setRole] = useState('parent');
+  const [dob, setDob] = useState('');
   const [isPending, startTransition] = useTransition();
+  const { showSnackbar } = useSnackbar();
 
   const handlePlayerSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
+    const currentRole = role === 'player' ? 'Player' : 'Parent';
+    
     startTransition(async () => {
-      await addPlayerAdmin(formData);
-      setModal('none');
+      const res = await addPlayerAdmin(formData);
+      if (res?.error) {
+        showSnackbar({ message: res.error, type: 'error' });
+      } else {
+        setModal('none');
+        setDob('');
+        showSnackbar({ message: `${currentRole} added successfully`, type: 'success' });
+      }
     });
   };
 
@@ -21,8 +33,13 @@ export function QuickActions() {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     startTransition(async () => {
-      await addCoachAdmin(formData);
-      setModal('none');
+      const res = await addCoachAdmin(formData);
+      if (res?.error) {
+        showSnackbar({ message: res.error, type: 'error' });
+      } else {
+        setModal('none');
+        showSnackbar({ message: 'Coach added successfully', type: 'success' });
+      }
     });
   };
 
@@ -116,10 +133,14 @@ export function QuickActions() {
                   </div>
                 )}
 
-                <div className="flex flex-col gap-1">
-                  <label className="text-sm font-medium text-slate-900">Date of Birth</label>
-                  <input name="dob" type="date" required className="w-full h-12 px-4 bg-white border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-slate-900 outline-none" />
-                </div>
+                <DobInput
+                  id="dob"
+                  name="dob"
+                  label={role === 'parent' ? "Player's Date of Birth" : "Date of Birth"}
+                  value={dob}
+                  onChange={setDob}
+                  required
+                />
 
                 <p className="text-[12px] text-slate-500 mt-2">
                   A temporary password will be securely generated and assigned to this user automatically.

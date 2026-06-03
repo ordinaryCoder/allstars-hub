@@ -5,9 +5,12 @@ import { signup } from './action';
 import { AcademyLogo, VisibilityIcon, VisibilityOffIcon } from '../../../components/ui/icons';
 import { ACADEMY_NAME } from '@/lib/constant';
 import { DobInput } from './DobInput';
+import { useRouter } from 'next/navigation';
 
 export default function SignupPage() {
+  const router = useRouter();
   const [role, setRole] = useState('parent');
+  const [error, setError] = useState<string | null>(null);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [guardianName, setGuardianName] = useState('');
@@ -20,12 +23,18 @@ export default function SignupPage() {
 
   const handleSignup = async (e: any) => {
     e.preventDefault();
+    setError(null);
     const formData = new FormData(e.currentTarget);
 
     try {
-      await signup(formData);
-    } catch (err) {
-      console.error(err);
+      const res = await signup(formData);
+      if (res?.error) {
+        setError(res.error);
+      } else if (res?.success) {
+        router.push(`/pending?email=${encodeURIComponent(res.email!)}`);
+      }
+    } catch (err: any) {
+      setError(err.message || 'Unable to complete signup');
     }
   };
 
@@ -43,6 +52,11 @@ export default function SignupPage() {
       {/* Auth Container */}
       <main className="w-full max-w-md mx-auto bg-white shadow-xl border border-black/10 rounded-2xl p-6 sm:p-10">
         <form onSubmit={handleSignup} method="POST" className="flex flex-col gap-4">
+          {error && (
+            <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl text-center font-medium">
+              {error}
+            </div>
+          )}
           {/* Role Selection */}
           <div className="flex flex-col gap-1.5 mb-2">
             <label className="text-sm font-medium text-gray-900">I am a...</label>

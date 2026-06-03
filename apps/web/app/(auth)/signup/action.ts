@@ -1,20 +1,24 @@
 'use server'
 
-import { redirect } from 'next/navigation'
 import { createClient } from '../../../lib/server'
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { prisma } from '../../../../../packages/database'
 
-export async function signup(formData: FormData): Promise<void> {
+export async function signup(formData: FormData, isFromAdmin = false) {
   const email = formData.get('email')?.toString().trim() ?? ''
-  const password = formData.get('password')?.toString() ?? ''
+  let password = formData.get('password')?.toString() ?? ''
   const firstName = formData.get('firstName')?.toString().trim() ?? ''
   const lastName = formData.get('lastName')?.toString().trim() ?? ''
   const mobileNumber = formData.get('mobileNumber')?.toString().trim() ?? ''
   const role = formData.get('role')?.toString() ?? 'parent'
   const guardianName = formData.get('guardianName')?.toString().trim() ?? ''
 
+  if (isFromAdmin && !password) {
+    password = Math.random().toString(36).slice(-8) + 'X1!'
+  }
+
   if (!email || !password || !firstName || !lastName || !mobileNumber || (role === 'parent' && !guardianName)) {
-    return redirect('/signup?error=Please fill in all required fields')
+    return { error: 'Please fill in all required fields' }
   }
 
   const academy = await prisma.academy.findFirst({
@@ -23,17 +27,30 @@ export async function signup(formData: FormData): Promise<void> {
   })
 
   if (!academy) {
-    return redirect('/signup?error=No active academy available')
+    return { error: 'No active academy available' }
   }
 
-  const supabase = await createClient()
-  const { data: authData, error: authError } = await supabase.auth.signUp({
-    email,
-    password,
-  })
+  let authData;
+  let authError;
+
+  if (isFromAdmin) {
+    const supabaseAdmin = createSupabaseClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    );
+    const { data, error } = await supabaseAdmin.auth.signUp({ email, password });
+    authData = data;
+    authError = error;
+  } else {
+    const supabase = await createClient();
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    authData = data;
+    authError = error;
+  }
 
   if (authError || !authData?.user) {
-    return redirect(`/signup?error=${encodeURIComponent(authError?.message ?? 'Unable to create account')}`)
+    return { error: authError?.message ?? 'Unable to create account' }
   }
 
   try {
@@ -44,7 +61,7 @@ export async function signup(formData: FormData): Promise<void> {
         first_name: firstName,
         last_name: lastName,
         mobile_number: mobileNumber,
-        status: 'PENDING',
+        status: isFromAdmin ? 'ACTIVE' : 'PENDING',
         academy_roles: {
           create: {
             academy_id: academy.id,
@@ -56,8 +73,10 @@ export async function signup(formData: FormData): Promise<void> {
     console.log("Signup request saved for user:", email)
   } catch (error) {
     console.error('Signup DB error:', error)
-    return redirect('/signup?error=Unable to save signup request')
+    return { error: 'Unable to save signup request' }
   }
 
-  redirect(`/pending?email=${encodeURIComponent(email)}`)
+  if (!isFromAdmin) {
+    return { success: true, email }
+  }
 }
