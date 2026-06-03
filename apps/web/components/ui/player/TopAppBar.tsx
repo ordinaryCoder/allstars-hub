@@ -6,7 +6,6 @@ export function TopAppBar({ userName, initials, signOut }: { userName?: string; 
           {initials || 'U'}
         </div>
         <span className="text-sm font-medium text-slate-900">{userName || 'User'}</span>
-        <span className="material-symbols-outlined text-slate-500 text-[18px]">expand_more</span>
       </div>
       <div className="flex items-center">
         {signOut ? (

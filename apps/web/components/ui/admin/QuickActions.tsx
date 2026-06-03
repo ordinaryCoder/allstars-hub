@@ -46,7 +46,7 @@ export function QuickActions() {
   return (
     <section className="space-y-3">
       <h2 className="text-lg font-bold text-slate-900 px-1">Quick Actions</h2>
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 gap-4">
         <button onClick={() => setModal('player')} className="bg-white hover:bg-slate-50 border border-slate-100 rounded-2xl p-4 shadow-sm flex flex-col items-center justify-center gap-2 transition-transform active:scale-95 min-h-[100px]">
           <div className="w-10 h-10 rounded-full bg-slate-900 text-white flex items-center justify-center">
             <span className="material-symbols-outlined">person_add</span>
@@ -58,12 +58,6 @@ export function QuickActions() {
             <span className="material-symbols-outlined">person_outline</span>
           </div>
           <span className="text-xs font-semibold text-slate-900">Add Coach</span>
-        </button>
-        <button className="bg-white hover:bg-slate-50 border border-slate-100 rounded-2xl p-4 shadow-sm flex flex-col items-center justify-center gap-2 transition-transform active:scale-95 min-h-[100px]">
-          <div className="w-10 h-10 rounded-full bg-slate-900 text-white flex items-center justify-center">
-            <span className="material-symbols-outlined">calendar_view_day</span>
-          </div>
-          <span className="text-xs font-semibold text-slate-900">Manage Batches</span>
         </button>
       </div>
 

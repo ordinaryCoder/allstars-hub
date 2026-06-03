@@ -7,6 +7,7 @@ import { TopAppBar } from '../../components/ui/player/TopAppBar'
 import { HomeTab } from '../../components/ui/admin/HomeTab'
 import { BottomNavBar } from '../../components/ui/admin/BottomNavBar'
 
+// TODO: Check data mapping to schema and modify schema to fit data need in UI
 export default async function AdminPage({
   searchParams,
 }: {
