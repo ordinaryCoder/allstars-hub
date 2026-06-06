@@ -2,10 +2,10 @@
 import { redirect } from 'next/navigation'
 import { requireRole } from '../../lib/dal'
 import { prisma } from '../../../../packages/database'
-import { UserManagementBoard } from '../../components/ui/admin/UserManagementBoard'
-import { TopAppBar } from '../../components/ui/player/TopAppBar'
-import { HomeTab } from '../../components/ui/admin/HomeTab'
-import { BottomNavBar } from '../../components/ui/admin/BottomNavBar'
+import { UserManagementBoard } from './UserManagementBoard'
+import { TopAppBar } from '../player/TopAppBar'
+import { HomeTab } from './HomeTab'
+import { BottomNavBar } from './BottomNavBar'
 
 // TODO: Check data mapping to schema and modify schema to fit data need in UI
 export default async function AdminPage({

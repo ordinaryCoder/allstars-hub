@@ -201,6 +201,16 @@ CREATE OR REPLACE FUNCTION current_academy_id() RETURNS uuid AS $$
   SELECT NULLIF(current_setting('request.jwt.claims', true)::jsonb ->> 'academy_id', '')::uuid;
 $$ LANGUAGE sql STABLE;
 
+-- Add Current User ID Extractor
+CREATE OR REPLACE FUNCTION current_user_id() RETURNS uuid AS $$
+  SELECT COALESCE(current_setting('request.jwt.claims', true)::jsonb ->> 'sub', '00000000-0000-0000-0000-000000000000')::uuid;
+$$ LANGUAGE sql STABLE;
+
+-- Add Admin Check Extractor
+CREATE OR REPLACE FUNCTION is_admin() RETURNS boolean AS $$
+  SELECT COALESCE((current_setting('request.jwt.claims', true)::jsonb -> 'roles') ? 'admin', false);
+$$ LANGUAGE sql STABLE;
+
 -- 2. Enable Row Level Security on All Tables
 ALTER TABLE academies ENABLE ROW LEVEL SECURITY;
 ALTER TABLE players ENABLE ROW LEVEL SECURITY;
@@ -219,29 +229,37 @@ ALTER TABLE user_academy_roles ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Tenant Isolation: Academies" ON academies 
   USING (id = current_academy_id());
 
-CREATE POLICY "Tenant Isolation: Players" ON players 
-  USING (academy_id = current_academy_id()) 
-  WITH CHECK (academy_id = current_academy_id());
+CREATE POLICY "Tenant Isolation: Players Select" ON players FOR SELECT 
+  USING (academy_id = current_academy_id() AND (is_admin() OR user_id = current_user_id() OR EXISTS (SELECT 1 FROM parent_player pp WHERE pp.player_id = players.id AND pp.parent_user_id = current_user_id()) OR EXISTS (SELECT 1 FROM player_batches pb JOIN session_batches sb ON pb.batch_id = sb.batch_id JOIN sessions s ON sb.session_id = s.id WHERE pb.player_id = players.id AND s.created_by = current_user_id())));
 
-CREATE POLICY "Tenant Isolation: Attendance" ON attendance 
-  USING (academy_id = current_academy_id()) 
-  WITH CHECK (academy_id = current_academy_id());
+CREATE POLICY "Tenant Isolation: Players Insert" ON players FOR INSERT WITH CHECK (academy_id = current_academy_id() AND is_admin());
+CREATE POLICY "Tenant Isolation: Players Update" ON players FOR UPDATE USING (academy_id = current_academy_id() AND is_admin());
+CREATE POLICY "Tenant Isolation: Players Delete" ON players FOR DELETE USING (academy_id = current_academy_id() AND is_admin());
 
-CREATE POLICY "Tenant Isolation: locations" ON locations 
-  USING (academy_id = current_academy_id()) 
-  WITH CHECK (academy_id = current_academy_id());
+CREATE POLICY "Tenant Isolation: Attendance Select" ON attendance FOR SELECT 
+  USING (academy_id = current_academy_id());
+
+CREATE POLICY "Tenant Isolation: Attendance Insert" ON attendance FOR INSERT 
+  WITH CHECK (academy_id = current_academy_id() AND (is_admin() OR marked_by = current_user_id()));
+
+CREATE POLICY "Tenant Isolation: Attendance Update" ON attendance FOR UPDATE 
+  USING (academy_id = current_academy_id() AND (is_admin() OR marked_by = current_user_id()));
+
+CREATE POLICY "Tenant Isolation: Attendance Delete" ON attendance FOR DELETE 
+  USING (academy_id = current_academy_id() AND (is_admin() OR marked_by = current_user_id()));
 
 CREATE POLICY "Tenant Isolation: sports" ON sports 
   USING (academy_id = current_academy_id()) 
   WITH CHECK (academy_id = current_academy_id());
 
-CREATE POLICY "Tenant Isolation: batches" ON batches 
-  USING (academy_id = current_academy_id()) 
-  WITH CHECK (academy_id = current_academy_id());
+CREATE POLICY "Tenant Isolation: Sessions Insert" ON sessions FOR INSERT 
+  WITH CHECK (academy_id = current_academy_id() AND (is_admin() OR created_by = current_user_id()));
 
-CREATE POLICY "Tenant Isolation: sessions" ON sessions 
-  USING (academy_id = current_academy_id()) 
-  WITH CHECK (academy_id = current_academy_id());
+CREATE POLICY "Tenant Isolation: Sessions Update" ON sessions FOR UPDATE 
+  USING (academy_id = current_academy_id() AND (is_admin() OR created_by = current_user_id()));
+
+CREATE POLICY "Tenant Isolation: Sessions Delete" ON sessions FOR DELETE 
+  USING (academy_id = current_academy_id() AND (is_admin() OR created_by = current_user_id()));
 
 -- 4. Dynamic Mapping & Relationship Tables Isolation Policies
 CREATE POLICY "Tenant Isolation: user_academy_roles" ON user_academy_roles
@@ -252,9 +270,17 @@ CREATE POLICY "Tenant Isolation: session_batches" ON session_batches
   USING (EXISTS (SELECT 1 FROM sessions WHERE sessions.id = session_batches.session_id AND sessions.academy_id = current_academy_id()))
   WITH CHECK (EXISTS (SELECT 1 FROM sessions WHERE sessions.id = session_batches.session_id AND sessions.academy_id = current_academy_id()));
 
-CREATE POLICY "Tenant Isolation: player_batches" ON player_batches
-  USING (EXISTS (SELECT 1 FROM players WHERE players.id = player_batches.player_id AND players.academy_id = current_academy_id()))
-  WITH CHECK (EXISTS (SELECT 1 FROM players WHERE players.id = player_batches.player_id AND players.academy_id = current_academy_id()));
+CREATE POLICY "Tenant Isolation: player_batches Select" ON player_batches FOR SELECT
+  USING (EXISTS (SELECT 1 FROM players WHERE players.id = player_batches.player_id AND players.academy_id = current_academy_id()));
+
+CREATE POLICY "Tenant Isolation: player_batches Insert" ON player_batches FOR INSERT
+  WITH CHECK (is_admin() AND EXISTS (SELECT 1 FROM players WHERE players.id = player_batches.player_id AND players.academy_id = current_academy_id()));
+
+CREATE POLICY "Tenant Isolation: player_batches Update" ON player_batches FOR UPDATE
+  USING (is_admin() AND EXISTS (SELECT 1 FROM players WHERE players.id = player_batches.player_id AND players.academy_id = current_academy_id()));
+
+CREATE POLICY "Tenant Isolation: player_batches Delete" ON player_batches FOR DELETE
+  USING (is_admin() AND EXISTS (SELECT 1 FROM players WHERE players.id = player_batches.player_id AND players.academy_id = current_academy_id()));
 
 CREATE POLICY "Tenant Isolation: parent_player" ON parent_player
   USING (EXISTS (SELECT 1 FROM players WHERE players.id = parent_player.player_id AND players.academy_id = current_academy_id()))
@@ -316,3 +342,43 @@ $$;
 GRANT EXECUTE ON FUNCTION public.custom_access_token_hook(jsonb) TO supabase_auth_admin;
 REVOKE ALL ON FUNCTION public.custom_access_token_hook(jsonb) FROM PUBLIC;
 GRANT USAGE ON SCHEMA public TO supabase_auth_admin;
+
+
+-- ENABLE NEW TABLES RLS --
+ALTER TABLE coach_batches ENABLE ROW LEVEL SECURITY;
+ALTER TABLE goals ENABLE ROW LEVEL SECURITY;
+
+-- ADMIN ONLY FOR ASSIGNMENTS --
+CREATE POLICY "Tenant Isolation: coach_batches" ON coach_batches
+  USING (is_admin() OR user_id = current_user_id())
+  WITH CHECK (is_admin());
+
+-- ISOLATE LOCATIONS (Coach sees only assigned) --
+DROP POLICY IF EXISTS "Tenant Isolation: locations" ON locations;
+CREATE POLICY "Tenant Isolation: locations Select" ON locations FOR SELECT 
+  USING (academy_id = current_academy_id() AND (is_admin() OR EXISTS (SELECT 1 FROM coach_batches cb JOIN batches b ON cb.batch_id = b.id WHERE cb.user_id = current_user_id() AND b.location_id = locations.id)));
+
+-- ISOLATE BATCHES (Coach sees only assigned) --
+DROP POLICY IF EXISTS "Tenant Isolation: batches" ON batches;
+CREATE POLICY "Tenant Isolation: batches Select" ON batches FOR SELECT 
+  USING (academy_id = current_academy_id() AND (is_admin() OR EXISTS (SELECT 1 FROM coach_batches cb WHERE cb.user_id = current_user_id() AND cb.batch_id = batches.id)));
+
+-- ISOLATE SESSIONS (Coach sees created, assigned, or batch-linked) --
+DROP POLICY IF EXISTS "Tenant Isolation: Sessions Select" ON sessions;
+CREATE POLICY "Tenant Isolation: Sessions Select" ON sessions FOR SELECT 
+  USING (academy_id = current_academy_id() AND (is_admin() OR created_by = current_user_id() OR coach_id = current_user_id() OR EXISTS (SELECT 1 FROM session_batches sb JOIN coach_batches cb ON sb.batch_id = cb.batch_id WHERE sb.session_id = sessions.id AND cb.user_id = current_user_id())));
+
+-- RESTRICT SESSION BATCH CREATION (Coach only links assigned batches) --
+DROP POLICY IF EXISTS "Tenant Isolation: session_batches" ON session_batches;
+CREATE POLICY "Tenant Isolation: session_batches Insert" ON session_batches FOR INSERT 
+  WITH CHECK (is_admin() OR EXISTS (SELECT 1 FROM sessions s WHERE s.id = session_id AND s.created_by = current_user_id() AND EXISTS (SELECT 1 FROM coach_batches cb WHERE cb.batch_id = session_batches.batch_id AND cb.user_id = current_user_id())));
+
+-- READ session_batches (Coach sees batches linked to visible sessions)
+CREATE POLICY "Tenant Isolation: session_batches Select" ON session_batches FOR SELECT 
+  USING (EXISTS (SELECT 1 FROM sessions s WHERE s.id = session_batches.session_id AND s.academy_id = current_academy_id()));
+
+-- GOALS RLS --
+CREATE POLICY "Tenant Isolation: goals Select" ON goals FOR SELECT 
+  USING (EXISTS (SELECT 1 FROM sessions WHERE sessions.id = goals.session_id AND sessions.academy_id = current_academy_id()));
+CREATE POLICY "Tenant Isolation: goals Modify" ON goals FOR ALL 
+  USING (is_admin() OR EXISTS (SELECT 1 FROM sessions WHERE sessions.id = goals.session_id AND (sessions.created_by = current_user_id() OR sessions.coach_id = current_user_id())));

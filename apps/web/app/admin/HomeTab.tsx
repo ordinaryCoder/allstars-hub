@@ -1,4 +1,4 @@
-import { prisma } from '../../../../../packages/database';
+import { prisma } from '../../../../packages/database';
 import { QuickActions } from './QuickActions';
 import { WeeklyAttendanceChart } from './WeeklyAttendanceChart';
 

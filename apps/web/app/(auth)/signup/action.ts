@@ -12,12 +12,13 @@ export async function signup(formData: FormData, isFromAdmin = false) {
   const mobileNumber = formData.get('mobileNumber')?.toString().trim() ?? ''
   const role = formData.get('role')?.toString() ?? 'parent'
   const guardianName = formData.get('guardianName')?.toString().trim() ?? ''
+  const dob = formData.get('dob')?.toString() ?? ''
 
   if (isFromAdmin && !password) {
     password = Math.random().toString(36).slice(-8) + 'X1!'
   }
 
-  if (!email || !password || !firstName || !lastName || !mobileNumber || (role === 'parent' && !guardianName)) {
+  if (!email || !password || !firstName || !lastName || !mobileNumber || (role === 'parent' && !guardianName) || !dob) {
     return { error: 'Please fill in all required fields' }
   }
 
@@ -54,22 +55,57 @@ export async function signup(formData: FormData, isFromAdmin = false) {
   }
 
   try {
-    await prisma.user.create({
-      data: {
-        id: authData.user.id,
-        email,
-        first_name: firstName,
-        last_name: lastName,
-        mobile_number: mobileNumber,
-        status: isFromAdmin ? 'ACTIVE' : 'PENDING',
-        academy_roles: {
-          create: {
-            academy_id: academy.id,
-            permissions: [role],
+    if (role === 'parent') {
+      await prisma.user.create({
+        data: {
+          id: authData.user.id,
+          email,
+          first_name: guardianName,
+          last_name: lastName, // last_name is required in the Prisma schema, so we pass an empty string
+          mobile_number: mobileNumber,
+          status: isFromAdmin ? 'ACTIVE' : 'PENDING',
+          academy_roles: {
+            create: { academy_id: academy.id, permissions: ['parent'] },
+          },
+          parent_of: {
+            create: {
+              player: {
+                create: {
+                  academy_id: academy.id,
+                  first_name: firstName,
+                  last_name: lastName,
+                  dob: new Date(dob),
+                }
+              }
+            }
+          }
+        },
+      });
+    } else {
+      await prisma.user.create({
+        data: {
+          id: authData.user.id,
+          email,
+          first_name: firstName,
+          last_name: lastName,
+          mobile_number: mobileNumber,
+          status: isFromAdmin ? 'ACTIVE' : 'PENDING',
+          academy_roles: {
+            create: { academy_id: academy.id, permissions: ['player'] },
           },
         },
-      },
-    })
+      });
+
+      await prisma.player.create({
+        data: {
+          academy_id: academy.id,
+          user_id: authData.user.id,
+          first_name: firstName,
+          last_name: lastName,
+          dob: new Date(dob),
+        }
+      });
+    }
     console.log("Signup request saved for user:", email)
   } catch (error) {
     console.error('Signup DB error:', error)

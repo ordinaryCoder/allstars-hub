@@ -1,9 +1,9 @@
-import { TopAppBar } from '../../components/ui/player/TopAppBar';
-import { NextSession } from '../../components/ui/player/NextSession';
-import { SessionGoals } from '../../components/ui/player/SessionGoals';
-import { AttendanceHealth } from '../../components/ui/player/AttendanceHealth';
-import { CalendarWidget } from '../../components/ui/player/CalendarWidget';
-import { BottomNav } from '../../components/ui/player/BottomNav';
+import { TopAppBar } from './TopAppBar';
+import { NextSession } from './NextSession';
+import { SessionGoals } from './SessionGoals';
+import { AttendanceHealth } from './AttendanceHealth';
+import { CalendarWidget } from './CalendarWidget';
+import { BottomNav } from './BottomNav';
 import { createClient } from '../../lib/server';
 import { redirect } from 'next/navigation';
 import { requireRole } from '../../lib/dal';
