@@ -72,6 +72,10 @@ export async function HomeTab() {
   const locations = await prisma.location.findMany({
     select: { id: true, name: true }
   });
+  
+  const batches = await prisma.batch.findMany({
+    select: { id: true, name: true, location_id: true }
+  });
 
   // Get boundaries for the current week (Monday - Sunday)
   const dayOfWeek = now.getDay() || 7;
@@ -217,7 +221,7 @@ export async function HomeTab() {
       />
 
       {/* Quick Actions Integration */}
-      <QuickActions />
+      <QuickActions locations={locations} batches={batches} />
 
       {/* Recent Activity / Featured Card */}
       <div className="flex flex-col gap-3">

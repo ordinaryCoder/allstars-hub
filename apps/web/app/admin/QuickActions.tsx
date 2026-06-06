@@ -5,10 +5,12 @@ import { addPlayerAdmin, addCoachAdmin } from './actions';
 import { DobInput } from '../(auth)/signup/DobInput';
 import { useSnackbar } from '../../components/ui/shared/Snackbar';
 
-export function QuickActions() {
+export function QuickActions({ locations = [], batches = [] }: { locations?: any[], batches?: any[] }) {
   const [modal, setModal] = useState<'none' | 'player' | 'coach'>('none');
   const [role, setRole] = useState('parent');
   const [dob, setDob] = useState('');
+  const [selectedLocation, setSelectedLocation] = useState('');
+  const [selectedBatches, setSelectedBatches] = useState<string[]>([]);
   const [isPending, startTransition] = useTransition();
   const { showSnackbar } = useSnackbar();
 
@@ -32,16 +34,21 @@ export function QuickActions() {
   const handleCoachSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
+    formData.append('batchIds', selectedBatches.join(','));
     startTransition(async () => {
       const res = await addCoachAdmin(formData);
       if (res?.error) {
         showSnackbar({ message: res.error, type: 'error' });
       } else {
         setModal('none');
+        setSelectedLocation('');
+        setSelectedBatches([]);
         showSnackbar({ message: 'Coach added successfully', type: 'success' });
       }
     });
   };
+
+  const filteredBatches = batches.filter(b => b.location_id === selectedLocation);
 
   return (
     <section className="space-y-3">
@@ -169,6 +176,47 @@ export function QuickActions() {
                   <label className="tepxt-sm font-medium text-slate-900">Mobile Number</label>
                   <input name="mobileNumber" type="tel" required placeholder="+1 (555) 000-0000" className="w-full h-12 px-4 bg-white border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-slate-900 outline-none" />
                 </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm font-medium text-slate-900">Location</label>
+                  <select 
+                    required
+                    value={selectedLocation} 
+                    onChange={(e) => { setSelectedLocation(e.target.value); setSelectedBatches([]); }}
+                    className="w-full h-12 px-4 bg-white border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-slate-900 outline-none"
+                  >
+                    <option value="" disabled>Select a location</option>
+                    {locations.map(loc => (
+                      <option key={loc.id} value={loc.id}>{loc.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {selectedLocation && (
+                  <div className="flex flex-col gap-2">
+                    <label className="text-sm font-medium text-slate-900">Assign Batches</label>
+                    {filteredBatches.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {filteredBatches.map(batch => (
+                          <label key={batch.id} className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg cursor-pointer hover:bg-slate-100 transition-colors">
+                            <input 
+                              type="checkbox" 
+                              checked={selectedBatches.includes(batch.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) setSelectedBatches([...selectedBatches, batch.id]);
+                                else setSelectedBatches(selectedBatches.filter(id => id !== batch.id));
+                              }}
+                              className="rounded border-slate-300 text-slate-900 focus:ring-slate-900" 
+                            />
+                            <span className="text-sm font-medium text-slate-700">{batch.name}</span>
+                          </label>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-500">No batches available at this location.</p>
+                    )}
+                  </div>
+                )}
 
                 <p className="text-[12px] text-slate-500 mt-2">
                   A temporary password will be securely generated and assigned to this user automatically.

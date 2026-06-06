@@ -15,6 +15,25 @@ export function NewSessionForm({ batches }: { batches: Batch[] }) {
   const [selectedBatchIds, setSelectedBatchIds] = useState<string[]>([]);
   const [isBatchDropdownOpen, setIsBatchDropdownOpen] = useState(false);
   const [selectedDays, setSelectedDays] = useState<string[]>([]);
+  const [goals, setGoals] = useState<string[]>([]);
+  const [newGoal, setNewGoal] = useState('');
+
+  const addGoal = () => {
+    if (newGoal.trim()) {
+      setGoals([...goals, newGoal.trim()]);
+      setNewGoal('');
+    }
+  };
+
+  const updateGoal = (index: number, value: string) => {
+    const updatedGoals = [...goals];
+    updatedGoals[index] = value;
+    setGoals(updatedGoals);
+  };
+
+  const removeGoal = (index: number) => {
+    setGoals(goals.filter((_, i) => i !== index));
+  };
 
   const toggleBatch = (id: string) => {
     if (selectedBatchIds.includes(id)) {
@@ -124,7 +143,7 @@ export function NewSessionForm({ batches }: { batches: Batch[] }) {
 
         {/* Date & Time Section */}
         {sessionType === 'one-time' ? (
-          <section className="grid grid-cols-2 gap-4">
+          <section className="space-y-4">
             <div className="space-y-3">
               <h2 className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Date</h2>
               <div className="bg-white rounded-2xl px-4 py-2 shadow-sm border border-slate-200 flex items-center gap-3 h-[56px] focus-within:ring-2 focus-within:ring-indigo-500">
@@ -132,11 +151,20 @@ export function NewSessionForm({ batches }: { batches: Batch[] }) {
                 <input type="date" className="w-full bg-transparent text-sm font-medium text-slate-900 outline-none" />
               </div>
             </div>
-            <div className="space-y-3">
-              <h2 className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Time</h2>
-              <div className="bg-white rounded-2xl px-4 py-2 shadow-sm border border-slate-200 flex items-center gap-3 h-[56px] focus-within:ring-2 focus-within:ring-indigo-500">
-                <span className="material-symbols-outlined text-slate-400 text-[20px]">schedule</span>
-                <input type="time" className="w-full bg-transparent text-sm font-medium text-slate-900 outline-none" />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-3">
+                <h2 className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Start Time</h2>
+                <div className="bg-white rounded-2xl px-4 py-2 shadow-sm border border-slate-200 flex items-center gap-3 h-[56px] focus-within:ring-2 focus-within:ring-indigo-500">
+                  <span className="material-symbols-outlined text-slate-400 text-[20px]">schedule</span>
+                  <input type="time" className="w-full bg-transparent text-sm font-medium text-slate-900 outline-none" />
+                </div>
+              </div>
+              <div className="space-y-3">
+                <h2 className="text-xs font-semibold text-slate-700 uppercase tracking-wider">End Time</h2>
+                <div className="bg-white rounded-2xl px-4 py-2 shadow-sm border border-slate-200 flex items-center gap-3 h-[56px] focus-within:ring-2 focus-within:ring-indigo-500">
+                  <span className="material-symbols-outlined text-slate-400 text-[20px]">schedule</span>
+                  <input type="time" className="w-full bg-transparent text-sm font-medium text-slate-900 outline-none" />
+                </div>
               </div>
             </div>
           </section>
@@ -156,11 +184,20 @@ export function NewSessionForm({ batches }: { batches: Batch[] }) {
                 ))}
               </div>
             </div>
-            <div className="space-y-3">
-              <h2 className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Time</h2>
-              <div className="bg-white rounded-2xl px-4 py-2 shadow-sm border border-slate-200 flex items-center gap-3 h-[56px] focus-within:ring-2 focus-within:ring-indigo-500">
-                <span className="material-symbols-outlined text-slate-400 text-[20px]">schedule</span>
-                <input type="time" className="w-full bg-transparent text-sm font-medium text-slate-900 outline-none" />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-3">
+                <h2 className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Start Time</h2>
+                <div className="bg-white rounded-2xl px-4 py-2 shadow-sm border border-slate-200 flex items-center gap-3 h-[56px] focus-within:ring-2 focus-within:ring-indigo-500">
+                  <span className="material-symbols-outlined text-slate-400 text-[20px]">schedule</span>
+                  <input type="time" className="w-full bg-transparent text-sm font-medium text-slate-900 outline-none" />
+                </div>
+              </div>
+              <div className="space-y-3">
+                <h2 className="text-xs font-semibold text-slate-700 uppercase tracking-wider">End Time</h2>
+                <div className="bg-white rounded-2xl px-4 py-2 shadow-sm border border-slate-200 flex items-center gap-3 h-[56px] focus-within:ring-2 focus-within:ring-indigo-500">
+                  <span className="material-symbols-outlined text-slate-400 text-[20px]">schedule</span>
+                  <input type="time" className="w-full bg-transparent text-sm font-medium text-slate-900 outline-none" />
+                </div>
               </div>
             </div>
           </section>
@@ -175,11 +212,52 @@ export function NewSessionForm({ batches }: { batches: Batch[] }) {
           </div>
         </section>
 
-        {/* Notes Section */}
+        {/* Goals Section */}
         <section className="space-y-3">
-          <h2 className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Notes (Optional)</h2>
-          <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 focus-within:border-indigo-500 transition-colors">
-            <textarea className="w-full border-none p-0 focus:ring-0 text-sm text-slate-900 placeholder:text-slate-400 resize-none outline-none" placeholder="Add specific instructions for players or parents..." rows={3}></textarea>
+          <h2 className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Goals</h2>
+          <div className="space-y-2">
+            {goals.map((goal, index) => (
+              <div key={index} className="flex items-center gap-2 bg-white rounded-xl p-3 border border-slate-200 shadow-sm focus-within:border-indigo-500 focus-within:ring-1 focus-within:ring-indigo-500 transition-all">
+                <span className="material-symbols-outlined text-slate-400 text-[20px]">flag</span>
+                <input 
+                  type="text" 
+                  value={goal} 
+                  onChange={(e) => updateGoal(index, e.target.value)} 
+                  className="w-full bg-transparent text-sm font-medium text-slate-900 outline-none" 
+                  placeholder="e.g. Dribbling practice"
+                />
+                <button 
+                  onClick={() => removeGoal(index)} 
+                  className="text-slate-400 hover:text-red-500 transition-colors flex items-center justify-center w-8 h-8 rounded-full hover:bg-red-50"
+                  title="Remove goal"
+                >
+                  <span className="material-symbols-outlined text-[18px]">close</span>
+                </button>
+              </div>
+            ))}
+            <div className="flex items-center gap-2 bg-white rounded-xl p-3 border border-slate-200 shadow-sm focus-within:border-indigo-500 focus-within:ring-1 focus-within:ring-indigo-500 transition-all">
+              <span className="material-symbols-outlined text-indigo-400 text-[20px]">add</span>
+              <input 
+                type="text" 
+                value={newGoal}
+                onChange={(e) => setNewGoal(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    addGoal();
+                  }
+                }}
+                className="w-full bg-transparent text-sm font-medium text-slate-900 outline-none placeholder:text-slate-400" 
+                placeholder="Add a new goal..."
+              />
+              <button 
+                onClick={addGoal}
+                disabled={!newGoal.trim()}
+                className="text-indigo-600 disabled:text-slate-300 disabled:bg-transparent font-medium text-sm px-3 py-1 rounded-md hover:bg-indigo-50 transition-colors"
+              >
+                Add
+              </button>
+            </div>
           </div>
         </section>
       </main>

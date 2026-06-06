@@ -70,6 +70,7 @@ model Location {
   academy  Academy   @relation(fields: [academy_id], references: [id])
   sessions Session[]
   batches  Batch[]
+  players  Player[]
 
   @@map("locations")
 }
@@ -106,6 +107,7 @@ model Batch {
 model Player {
   id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   academy_id String   @db.Uuid
+  location_id String   @db.Uuid // NEW: Player's primary or registered branch
   user_id    String?  @db.Uuid // Nullable for self-login
   first_name String
   last_name  String
@@ -113,6 +115,7 @@ model Player {
   is_active  Boolean  @default(true)
 
   academy Academy @relation(fields: [academy_id], references: [id])
+  location Location @relation(fields: [location_id], references: [id]) // NEW
   batches PlayerBatch[]
   attendance Attendance[]
   parents ParentPlayer[]
