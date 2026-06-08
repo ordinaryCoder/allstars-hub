@@ -1,6 +1,7 @@
 import { ApprovalStatus } from '../generated/prisma'
 import { prisma } from '../index';
 
+// TODO: Obsolete Now, Use Seed.sql to inject test data.
 async function main() {
   const ACADEMY_ID = '867d3e6c-7e3e-4f3d-8f3e-7e3e4f3d8f3e'
 

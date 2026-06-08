@@ -1,11 +1,21 @@
 import Link from 'next/link';
+import { createClient } from '../../lib/server';
+import { redirect } from 'next/navigation';
 
 export default function UnauthorizedPage({
   searchParams,
 }: {
-  searchParams: { email?: string };
+  searchParams: {email?: string} | null;
 }) {
-  const email = searchParams?.email;
+  const resolvedParams: string | undefined = searchParams?.email;
+  const email: string | undefined = resolvedParams;
+
+  async function handleSignOut() {
+    'use server';
+    const supabase = await createClient();
+    await supabase.auth.signOut();
+    redirect('/login');
+  }
 
   return (
     <>
@@ -61,10 +71,12 @@ export default function UnauthorizedPage({
             </div>
 
             {/* Primary Action */}
-            <Link href="/login" className="w-full h-[44px] bg-[#000000] text-[#ffffff] rounded-xl text-[14px] font-medium leading-[20px] shadow-md active:scale-[0.98] transition-all flex items-center justify-center gap-2 hover:opacity-90">
-              <span className="material-symbols-outlined" data-icon="login">login</span>
-              Go to Login Page
-            </Link>
+            <form action={handleSignOut} className="w-full">
+              <button type="submit" className="w-full h-[44px] bg-[#000000] text-[#ffffff] rounded-xl text-[14px] font-medium leading-[20px] shadow-md active:scale-[0.98] transition-all flex items-center justify-center gap-2 hover:opacity-90">
+                <span className="material-symbols-outlined" data-icon="login">login</span>
+                Go to Login Page
+              </button>
+            </form>
           </main>
         </div>
       </div>

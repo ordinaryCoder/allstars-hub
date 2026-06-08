@@ -159,7 +159,7 @@ export async function HomeTab() {
   }
 
   // Fetch upcoming sessions grouped by the exact same hour
-  let nextSessions: any[] = [];
+  let nextCoachingSessions: any[] = [];
   try {
     const futureSessions = await prisma.session.findMany({
       where: { start_time: { gt: now } },
@@ -178,7 +178,7 @@ export async function HomeTab() {
       const targetDate = firstSessionTime.getDate();
       const targetHour = firstSessionTime.getHours();
 
-      nextSessions = futureSessions.filter((s) => s.start_time.getFullYear() === targetYear && s.start_time.getMonth() === targetMonth && s.start_time.getDate() === targetDate && s.start_time.getHours() === targetHour);
+      nextCoachingSessions = futureSessions.filter((s) => s.start_time.getFullYear() === targetYear && s.start_time.getMonth() === targetMonth && s.start_time.getDate() === targetDate && s.start_time.getHours() === targetHour);
     }
   } catch (e) {
     console.error("Upcoming sessions fetch failed", e);
@@ -225,8 +225,8 @@ export async function HomeTab() {
 
       {/* Recent Activity / Featured Card */}
       <div className="flex flex-col gap-3">
-        {nextSessions.length > 0 ? (
-          nextSessions.map((session) => {
+        {nextCoachingSessions.length > 0 ? (
+          nextCoachingSessions.map((session) => {
             const title = session.batches?.map((b: any) => b.batch?.name).join(', ') || 'Training Session';
             const time = session.start_time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             const locationName = session.location?.name || 'Unknown Location';

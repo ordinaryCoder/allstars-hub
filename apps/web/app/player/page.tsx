@@ -1,5 +1,5 @@
 import { TopAppBar } from './TopAppBar';
-import { NextSession } from './NextSession';
+import { NextCoachingSession } from './NextCoachingSession';
 import { SessionGoals } from './SessionGoals';
 import { AttendanceHealth } from './AttendanceHealth';
 import { CalendarWidget } from './CalendarWidget';
@@ -90,7 +90,7 @@ export default async function PlayerPage() {
           <TopAppBar userName={userName} initials={initials} signOut={signOut} />
           
           <main className="flex-1 px-4 py-6 flex flex-col gap-6">
-            <NextSession />
+            <NextCoachingSession />
             <SessionGoals />
             <AttendanceHealth stats={attendanceHealth} />
             <CalendarWidget monthName={monthName} attendanceMap={attendanceMap} />

@@ -4,7 +4,7 @@ import { createClient } from '../../../lib/server'
 import { redirect } from 'next/navigation'
 
 type UserRole = 'coach' | 'admin' | 'player' | 'parent';
-type RedirectPath = '/coach' | '/admin' | '/dashboard' | '/unauthorized' | '/player' | '/parent' | '/pending' | null;
+type RedirectPath = '/coach' | '/admin' | '/dashboard' | '/unauthorized' | '/player' | '/parent' | '/pending' | string | null;
 
 
 // Todo: remove google signup/login 
@@ -64,7 +64,7 @@ export async function login(prevState: any, formData: FormData): Promise<{ error
     ? (roles.filter((role): role is UserRole => typeof role === 'string'))
     : [];
 
-  let targetRoute: RedirectPath = '/unauthorized';
+  let targetRoute: RedirectPath = `/unauthorized?email=${encodeURIComponent(authData.user.email ?? '')}`;
   if (cleanRoles.includes('coach')) targetRoute = '/coach';
   else if (cleanRoles.includes('admin')) targetRoute = '/admin';
   else if (cleanRoles.includes('player') || cleanRoles.includes('parent')) targetRoute = '/player';

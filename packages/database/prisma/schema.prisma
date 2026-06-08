@@ -42,9 +42,9 @@ model User {
   academy_roles     UserAcademyRole[]
   sessions_created  Session[]         @relation("CreatedBy")
   sessions_coaching Session[]         @relation("SessionCoach")
-  assigned_batches  CoachBatch[]
   attendance_marked Attendance[]      @relation("MarkedBy")
   parent_of         ParentPlayer[]
+  coachLocations    CoachLocation[]
 
   @@map("users")
 }
@@ -53,7 +53,7 @@ model UserAcademyRole {
   id          String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   user_id     String @db.Uuid
   academy_id  String @db.Uuid
-  permissions Json   // e.g. ["admin", "coach", "parent", "player"]
+  permissions Json // e.g. ["admin", "coach", "parent", "player"]
 
   user    User    @relation(fields: [user_id], references: [id])
   academy Academy @relation(fields: [academy_id], references: [id])
@@ -62,15 +62,16 @@ model UserAcademyRole {
 }
 
 model Location {
-  id         String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  academy_id String @db.Uuid
+  id         String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  academy_id String  @db.Uuid
   name       String
   address    String?
 
-  academy  Academy   @relation(fields: [academy_id], references: [id])
-  sessions Session[]
-  batches  Batch[]
-  players  Player[]
+  academy        Academy         @relation(fields: [academy_id], references: [id])
+  sessions       Session[]
+  batches        Batch[]
+  players        Player[]
+  coachLocations CoachLocation[]
 
   @@map("locations")
 }
@@ -92,6 +93,8 @@ model Batch {
   location_id String @db.Uuid
   sport_id    String @db.Uuid
   name        String // e.g., Morning U-15
+  age_min     Int? // null = open/any age
+  age_max     Int? // null = open/any age
 
   academy  Academy  @relation(fields: [academy_id], references: [id])
   location Location @relation(fields: [location_id], references: [id])
@@ -99,26 +102,25 @@ model Batch {
 
   players  PlayerBatch[]
   sessions SessionBatch[]
-  coaches  CoachBatch[]
 
   @@map("batches")
 }
 
 model Player {
-  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  academy_id String   @db.Uuid
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  academy_id  String   @db.Uuid
   location_id String   @db.Uuid // NEW: Player's primary or registered branch
-  user_id    String?  @db.Uuid // Nullable for self-login
-  first_name String
-  last_name  String
-  dob        DateTime @db.Date
-  is_active  Boolean  @default(true)
+  user_id     String?  @db.Uuid // Nullable for self-login
+  first_name  String
+  last_name   String
+  dob         DateTime @db.Date
+  is_active   Boolean  @default(true)
 
-  academy Academy @relation(fields: [academy_id], references: [id])
-  location Location @relation(fields: [location_id], references: [id]) // NEW
-  batches PlayerBatch[]
+  academy    Academy        @relation(fields: [academy_id], references: [id])
+  location   Location       @relation(fields: [location_id], references: [id]) // NEW
+  batches    PlayerBatch[]
   attendance Attendance[]
-  parents ParentPlayer[]
+  parents    ParentPlayer[]
 
   @@map("players")
 }
@@ -135,7 +137,7 @@ model Session {
   academy  Academy  @relation(fields: [academy_id], references: [id])
   location Location @relation(fields: [location_id], references: [id])
   creator  User     @relation("CreatedBy", fields: [created_by], references: [id])
-  coach    User?     @relation("SessionCoach", fields: [coach_id], references: [id])
+  coach    User?    @relation("SessionCoach", fields: [coach_id], references: [id])
 
   goals      Goal[]
   batches    SessionBatch[]
@@ -166,14 +168,20 @@ model PlayerBatch {
   @@map("player_batches")
 }
 
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LEAVE
+}
+
 model Attendance {
-  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  academy_id String   @db.Uuid
-  session_id String   @db.Uuid
-  player_id  String   @db.Uuid
-  marked_by  String   @db.Uuid
-  status     String   // Enum: Present, Absent, Late
-  marked_at  DateTime @default(now()) @db.Timestamptz
+  id         String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  academy_id String           @db.Uuid
+  session_id String           @db.Uuid
+  player_id  String           @db.Uuid
+  marked_by  String           @db.Uuid
+  status     AttendanceStatus @default(ABSENT)
+  marked_at  DateTime         @default(now()) @db.Timestamptz
 
   academy Academy @relation(fields: [academy_id], references: [id])
   session Session @relation(fields: [session_id], references: [id])
@@ -194,18 +202,6 @@ model ParentPlayer {
   @@map("parent_player")
 }
 
-// NEW MODELS
-model CoachBatch {
-  user_id  String @db.Uuid
-  batch_id String @db.Uuid
-
-  user  User  @relation(fields: [user_id], references: [id])
-  batch Batch @relation(fields: [batch_id], references: [id])
-
-  @@id([user_id, batch_id])
-  @@map("coach_batches")
-}
-
 model Goal {
   id           String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   session_id   String  @db.Uuid
@@ -215,4 +211,15 @@ model Goal {
   session Session @relation(fields: [session_id], references: [id])
 
   @@map("goals")
+}
+
+model CoachLocation {
+  user_id     String @db.Uuid
+  location_id String @db.Uuid
+
+  user     User     @relation(fields: [user_id], references: [id])
+  location Location @relation(fields: [location_id], references: [id])
+
+  @@id([user_id, location_id])
+  @@map("coach_locations")
 }
