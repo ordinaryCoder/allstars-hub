@@ -13,7 +13,12 @@
     "db:migrate:dev": "pnpm --filter database exec prisma migrate dev",
     "db:migrate:prod": "pnpm --filter database exec prisma migrate deploy",
     "db:generate": "pnpm --filter database exec prisma generate",
-    "db:seed": "pnpm --filter database exec prisma db seed"
+    "postinstall": "pnpm --filter database exec prisma generate",
+    "db:seed": "pnpm --filter database exec prisma db seed",
+    "db:push": "pnpm --filter database exec prisma db push",
+    "db:pull": "pnpm --filter database exec prisma db pull",
+    "db:reset": "pnpm --filter database exec prisma db reset"
+   
   },
   "keywords": [],
   "author": "",

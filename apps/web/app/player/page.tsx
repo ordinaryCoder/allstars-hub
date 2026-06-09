@@ -1,6 +1,5 @@
 import { TopAppBar } from './TopAppBar';
 import { NextCoachingSession } from './NextCoachingSession';
-import { SessionGoals } from './SessionGoals';
 import { AttendanceHealth } from './AttendanceHealth';
 import { CalendarWidget } from './CalendarWidget';
 import { BottomNav } from './BottomNav';
@@ -17,7 +16,7 @@ export default async function PlayerPage() {
     redirect('/login');
   }
 
-  await requireRole(user.id, 'player');
+  await requireRole(user.id, ['player', 'parent']);
 
   // Fetch player data along with their attendance
   const player = await prisma.player.findFirst({
@@ -69,6 +68,28 @@ export default async function PlayerPage() {
 
   const monthName = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
 
+  const nextSession = player ? await prisma.session.findFirst({
+    where: {
+      start_time: { gt: new Date() },
+      location_id: player.location_id,
+      batches: {
+        some: {
+          batch: {
+            players: {
+              some: { player_id: player.id }
+            }
+          }
+        }
+      }
+    },
+    orderBy: { start_time: 'asc' },
+    include: {
+      location: true,
+      coach: true,
+      batches: { include: { batch: true } }
+    }
+  }) : null;
+
   async function signOut() {
     'use server';
     const supabase = await createClient();
@@ -90,8 +111,7 @@ export default async function PlayerPage() {
           <TopAppBar userName={userName} initials={initials} signOut={signOut} />
           
           <main className="flex-1 px-4 py-6 flex flex-col gap-6">
-            <NextCoachingSession />
-            <SessionGoals />
+            <NextCoachingSession session={nextSession} />
             <AttendanceHealth stats={attendanceHealth} />
             <CalendarWidget monthName={monthName} attendanceMap={attendanceMap} />
           </main>
