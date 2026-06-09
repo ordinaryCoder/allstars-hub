@@ -13,12 +13,13 @@ export async function signup(formData: FormData, isFromAdmin = false) {
   const role = formData.get('role')?.toString() ?? 'parent'
   const guardianName = formData.get('guardianName')?.toString().trim() ?? ''
   const dob = formData.get('dob')?.toString() ?? ''
+  const locationId = formData.get('locationId')?.toString() ?? ''
 
   if (isFromAdmin && !password) {
     password = Math.random().toString(36).slice(-8) + 'X1!'
   }
 
-  if (!email || !password || !firstName || !lastName || !mobileNumber || (role === 'parent' && !guardianName) || !dob) {
+  if (!email || !password || !firstName || !lastName || !mobileNumber || (role === 'parent' && !guardianName) || !dob || !locationId) {
     return { error: 'Please fill in all required fields' }
   }
 
@@ -72,6 +73,7 @@ export async function signup(formData: FormData, isFromAdmin = false) {
               player: {
                 create: {
                   academy_id: academy.id,
+                  location_id: locationId,
                   first_name: firstName,
                   last_name: lastName,
                   dob: new Date(dob),
@@ -99,6 +101,7 @@ export async function signup(formData: FormData, isFromAdmin = false) {
       await prisma.player.create({
         data: {
           academy_id: academy.id,
+          location_id: locationId,
           user_id: authData.user.id,
           first_name: firstName,
           last_name: lastName,
@@ -115,4 +118,17 @@ export async function signup(formData: FormData, isFromAdmin = false) {
   if (!isFromAdmin) {
     return { success: true, email }
   }
+}
+
+export async function getLocations() {
+  const academy = await prisma.academy.findFirst({
+    where: { is_active: true },
+    select: { id: true },
+  });
+  if (!academy) return [];
+  return prisma.location.findMany({
+    where: { academy_id: academy.id },
+    select: { id: true, name: true },
+    orderBy: { name: 'asc' }
+  });
 }

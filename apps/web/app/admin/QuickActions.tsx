@@ -117,6 +117,16 @@ export function QuickActions({ locations = [], batches = [] }: { locations?: any
                   </div>
                 </div>
 
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium text-slate-900">Location</label>
+                <select name="locationId" required defaultValue="" className="w-full h-12 px-4 bg-white border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-slate-900 outline-none">
+                  <option value="" disabled>Select a location</option>
+                  {locations.map(loc => (
+                    <option key={loc.id} value={loc.id}>{loc.name}</option>
+                  ))}
+                </select>
+              </div>
+
                 <div className="flex flex-col gap-1">
                   <label className="text-sm font-medium text-slate-900">Email Address</label>
                   <input name="email" type="email" required placeholder="name@example.com" className="w-full h-12 px-4 bg-white border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-slate-900 outline-none" />
@@ -181,6 +191,7 @@ export function QuickActions({ locations = [], batches = [] }: { locations?: any
                   <label className="text-sm font-medium text-slate-900">Location</label>
                   <select 
                     required
+                  name="locationId"
                     value={selectedLocation} 
                     onChange={(e) => { setSelectedLocation(e.target.value); setSelectedBatches([]); }}
                     className="w-full h-12 px-4 bg-white border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-slate-900 outline-none"
