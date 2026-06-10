@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { signup } from './action';
+import { useState, useEffect } from 'react';
+import { signup, getLocations } from './action';
 import { AcademyLogo, VisibilityIcon, VisibilityOffIcon } from '../../../components/ui/icons';
 import { ACADEMY_NAME } from '@/lib/constant';
 import { DobInput } from './DobInput';
@@ -20,6 +20,11 @@ export default function SignupPage() {
   const [dob, setDob] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [locations, setLocations] = useState<{id: string, name: string}[]>([]);
+
+  useEffect(() => {
+    getLocations().then(setLocations);
+  }, []);
 
   const handleSignup = async (e: any) => {
     e.preventDefault();
@@ -124,6 +129,16 @@ export default function SignupPage() {
               <input id="emergencyContact" name="emergencyContact" type="tel" required value={emergencyContact} onChange={(e) => setEmergencyContact(e.target.value)} className="w-full h-12 px-4 bg-white border border-gray-300 rounded-xl text-base text-gray-900 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all" />
             </div>
           )}
+
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-gray-900" htmlFor="locationId">Location</label>
+            <select id="locationId" name="locationId" required defaultValue="" className="w-full h-12 px-4 bg-white border border-gray-300 rounded-xl text-base text-gray-900 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all">
+              <option value="" disabled>Select a location</option>
+              {locations.map(loc => (
+                <option key={loc.id} value={loc.id}>{loc.name}</option>
+              ))}
+            </select>
+          </div>
 
           <DobInput
             id="dob"

@@ -25,11 +25,12 @@ export async function addCoachAdmin(formData: FormData) {
   const firstName = formData.get('firstName')?.toString().trim() || '';
   const lastName = formData.get('lastName')?.toString().trim() || '';
   const mobileNumber = formData.get('mobileNumber')?.toString().trim() || '';
+  const locationId = formData.get('locationId')?.toString().trim() || '';
   const batchIdsString = formData.get('batchIds')?.toString().trim() || '';
 
   const batchIds = batchIdsString ? batchIdsString.split(',') : [];
 
-  if (!email || !firstName || !lastName || !mobileNumber) {
+  if (!email || !firstName || !lastName || !mobileNumber || !locationId) {
     return { error: 'Please fill in all required fields' };
   }
 
@@ -71,6 +72,9 @@ export async function addCoachAdmin(formData: FormData) {
           academy_id: academy.id,
           permissions: ['coach'] 
         }
+      },
+      coachLocations: {
+        create: { location_id: locationId }
       },
       assigned_batches: {
         create: batchIds.map((batchId) => ({ batch_id: batchId }))
