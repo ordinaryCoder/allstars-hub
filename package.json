@@ -5,9 +5,6 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "pnpm --filter web dev",
-    "build": "pnpm --filter web build",
-    "start": "pnpm --filter web start",
     "lint": "eslint",
     "db:migrate:init": "pnpm --filter database exec prisma migrate dev --name init_approval_system --create-only",
     "db:migrate:dev": "pnpm --filter database exec prisma migrate dev",
@@ -17,11 +14,13 @@
     "db:seed": "pnpm --filter database exec prisma db seed",
     "db:push": "pnpm --filter database exec prisma db push",
     "db:pull": "pnpm --filter database exec prisma db pull",
-    "db:reset": "pnpm --filter database exec prisma db reset"
-   
+    "start": "pnpm --filter web start",
+    "dev": "pnpm --filter web dev",
+    "build": "pnpm db:migrate:prod && pnpm --filter web build"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "packageManager": "pnpm@10.33.2"
 }
+"db:reset": "pnpm --filter database exec prisma db reset",
