@@ -1,13 +1,225 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
-  provider = "prisma-client"
+  provider = "prisma-client-js"
   output   = "../generated/prisma"
 }
 
 datasource db {
   provider = "postgresql"
+}
+
+enum ApprovalStatus {
+  PENDING
+  ACTIVE
+  INACTIVE
+}
+
+model Academy {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name       String
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now()) @db.Timestamptz
+
+  users_roles UserAcademyRole[]
+  locations   Location[]
+  sports      Sport[]
+  batches     Batch[]
+  players     Player[]
+  sessions    Session[]
+  attendance  Attendance[]
+
+  @@map("academies")
+}
+
+model User {
+  id            String         @id @db.Uuid
+  email         String         @unique
+  first_name    String
+  last_name     String
+  mobile_number String?
+  status        ApprovalStatus @default(PENDING)
+  created_at    DateTime       @default(now()) @db.Timestamptz
+
+  academy_roles     UserAcademyRole[]
+  sessions_created  Session[]         @relation("CreatedBy")
+  sessions_coaching Session[]         @relation("SessionCoach")
+  attendance_marked Attendance[]      @relation("MarkedBy")
+  parent_of         ParentPlayer[]
+  coachLocations    CoachLocation[]
+
+  @@map("users")
+}
+
+model UserAcademyRole {
+  id          String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id     String @db.Uuid
+  academy_id  String @db.Uuid
+  permissions Json // e.g. ["admin", "coach", "parent", "player"]
+
+  user    User    @relation(fields: [user_id], references: [id])
+  academy Academy @relation(fields: [academy_id], references: [id])
+
+  @@map("user_academy_roles")
+}
+
+model Location {
+  id         String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  academy_id String  @db.Uuid
+  name       String
+  address    String?
+
+  academy        Academy         @relation(fields: [academy_id], references: [id])
+  sessions       Session[]
+  batches        Batch[]
+  players        Player[]
+  coachLocations CoachLocation[]
+
+  @@map("locations")
+}
+
+model Sport {
+  id         String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  academy_id String @db.Uuid
+  name       String // e.g., Cricket, Football
+
+  academy Academy @relation(fields: [academy_id], references: [id])
+  batches Batch[]
+
+  @@map("sports")
+}
+
+model Batch {
+  id          String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  academy_id  String @db.Uuid
+  location_id String @db.Uuid
+  sport_id    String @db.Uuid
+  name        String // e.g., Morning U-15
+  age_min     Int? // null = open/any age
+  age_max     Int? // null = open/any age
+
+  academy  Academy  @relation(fields: [academy_id], references: [id])
+  location Location @relation(fields: [location_id], references: [id])
+  sport    Sport    @relation(fields: [sport_id], references: [id])
+
+  players  PlayerBatch[]
+  sessions SessionBatch[]
+
+  @@map("batches")
+}
+
+model Player {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  academy_id  String   @db.Uuid
+  location_id String   @db.Uuid // NEW: Player's primary or registered branch
+  user_id     String?  @db.Uuid // Nullable for self-login
+  first_name  String
+  last_name   String
+  dob         DateTime @db.Date
+  is_active   Boolean  @default(true)
+
+  academy    Academy        @relation(fields: [academy_id], references: [id])
+  location   Location       @relation(fields: [location_id], references: [id]) // NEW
+  batches    PlayerBatch[]
+  attendance Attendance[]
+  parents    ParentPlayer[]
+
+  @@map("players")
+}
+
+model Session {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  academy_id  String   @db.Uuid
+  location_id String   @db.Uuid
+  created_by  String   @db.Uuid
+  start_time  DateTime @db.Timestamptz
+  end_time    DateTime @db.Timestamptz
+  coach_id    String?  @db.Uuid // Ad-hoc or specific assignment
+
+  academy  Academy  @relation(fields: [academy_id], references: [id])
+  location Location @relation(fields: [location_id], references: [id])
+  creator  User     @relation("CreatedBy", fields: [created_by], references: [id])
+  coach    User?    @relation("SessionCoach", fields: [coach_id], references: [id])
+
+  goals      Goal[]
+  batches    SessionBatch[]
+  attendance Attendance[]
+
+  @@map("sessions")
+}
+
+model SessionBatch {
+  session_id String @db.Uuid
+  batch_id   String @db.Uuid
+
+  session Session @relation(fields: [session_id], references: [id])
+  batch   Batch   @relation(fields: [batch_id], references: [id])
+
+  @@id([session_id, batch_id])
+  @@map("session_batches")
+}
+
+model PlayerBatch {
+  player_id String @db.Uuid
+  batch_id  String @db.Uuid
+
+  player Player @relation(fields: [player_id], references: [id])
+  batch  Batch  @relation(fields: [batch_id], references: [id])
+
+  @@id([player_id, batch_id])
+  @@map("player_batches")
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LEAVE
+}
+
+model Attendance {
+  id         String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  academy_id String           @db.Uuid
+  session_id String           @db.Uuid
+  player_id  String           @db.Uuid
+  marked_by  String           @db.Uuid
+  status     AttendanceStatus @default(ABSENT)
+  marked_at  DateTime         @default(now()) @db.Timestamptz
+
+  academy Academy @relation(fields: [academy_id], references: [id])
+  session Session @relation(fields: [session_id], references: [id])
+  player  Player  @relation(fields: [player_id], references: [id])
+  marker  User    @relation("MarkedBy", fields: [marked_by], references: [id])
+
+  @@map("attendance")
+}
+
+model ParentPlayer {
+  parent_user_id String @db.Uuid
+  player_id      String @db.Uuid
+
+  parent User   @relation(fields: [parent_user_id], references: [id])
+  player Player @relation(fields: [player_id], references: [id])
+
+  @@id([parent_user_id, player_id])
+  @@map("parent_player")
+}
+
+model Goal {
+  id           String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  session_id   String  @db.Uuid
+  title        String
+  is_completed Boolean @default(false)
+
+  session Session @relation(fields: [session_id], references: [id])
+
+  @@map("goals")
+}
+
+model CoachLocation {
+  user_id     String @db.Uuid
+  location_id String @db.Uuid
+
+  user     User     @relation(fields: [user_id], references: [id])
+  location Location @relation(fields: [location_id], references: [id])
+
+  @@id([user_id, location_id])
+  @@map("coach_locations")
 }

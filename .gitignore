@@ -6,12 +6,17 @@ node_modules
 .env
 .env.*
 !.env.example
+*.pem
+.next/certs/
+*.crt
+*.key
 
 # Build outputs
 dist
 build
 .next/
 out/
+next-env.d.ts
 
 # IDE & OS files
 .vscode/
@@ -20,5 +25,27 @@ out/
 Thumbs.db
 
 # Supabase local files
-/packages/supabase/migrations/
-/packages/supabase/.temp/
+/packages/supabase/supabase/.temp/
+/packages/supabase/supabase/.branches/
+/packages/supabase/supabase/.snippets/
+
+# Prisma generated files
+/packages/database/generated
+
+# yarn
+/.pnp
+.pnp.js
+
+# testing
+/coverage
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
