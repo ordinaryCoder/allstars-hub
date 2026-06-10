@@ -16,11 +16,10 @@
     "db:pull": "pnpm --filter database exec prisma db pull",
     "start": "pnpm --filter web start",
     "dev": "pnpm --filter web dev",
-    "build": "pnpm db:migrate:prod && pnpm --filter web build"
+    "build": "pnpm --filter web build"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "packageManager": "pnpm@10.33.2"
 }
-"db:reset": "pnpm --filter database exec prisma db reset",
