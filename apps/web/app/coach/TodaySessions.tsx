@@ -20,7 +20,7 @@ export function TodaySessions({ sessions }: { sessions: any[] }) {
             const isCompleted = now > session.end_time;
             const isActive = now >= session.start_time && now <= session.end_time;
             const statusLabel = isActive ? 'ACTIVE' : isCompleted ? 'COMPLETED' : 'UPCOMING';
-            const title = session.batches.map((b) => b.batch.name).join(', ') || 'Untitled Session';
+            const title = session.batches.map((b: { batch: { name: string } }) => b.batch.name).join(', ') || 'Untitled Session';
 
             const timeString = new Intl.DateTimeFormat('en-US', {
               hour: 'numeric',

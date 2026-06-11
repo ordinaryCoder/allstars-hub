@@ -12,17 +12,21 @@ export default async function NewSessionPage() {
     redirect('/login');
   }
 
-  const coachBatches = await prisma.coachBatch.findMany({
-    where: { user_id: user.id },
-    include: { batch: { include: { location: true, players: true } } }
+  const coachBatches = await prisma.batch.findMany({
+    where: {
+      location: {
+        coachLocations: { some: { user_id: user.id } }
+      }
+    },
+    include: { location: true, players: true }
   });
 
-  const batches = coachBatches.map(cb => ({
-    id: cb.batch.id,
-    name: cb.batch.name,
-    locationId: cb.batch.location_id,
-    locationName: cb.batch.location.name,
-    playerCount: cb.batch.players.length,
+  const batches = coachBatches.map(batch => ({
+    id: batch.id,
+    name: batch.name,
+    locationId: batch.location_id,
+    locationName: batch.location.name,
+    playerCount: batch.players.length,
   }));
 
   return (
