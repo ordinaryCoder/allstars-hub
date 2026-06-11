@@ -75,9 +75,6 @@ export async function addCoachAdmin(formData: FormData) {
       },
       coachLocations: {
         create: { location_id: locationId }
-      },
-      assigned_batches: {
-        create: batchIds.map((batchId) => ({ batch_id: batchId }))
       }
     }
   });
