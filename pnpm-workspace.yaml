@@ -7,3 +7,10 @@ hoistPattern:
   - "!*prisma*"
 publicHoistPattern:
   - "!*prisma*"
+
+pnpm:
+  onlyBuiltDependencies:
+    - prisma
+    - "@prisma/engines"
+    - esbuild
+    - sharp
