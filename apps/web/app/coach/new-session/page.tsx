@@ -2,7 +2,8 @@ import Link from 'next/link';
 import { createClient } from '../../../lib/server';
 import { prisma } from '../../../../../packages/database';
 import { redirect } from 'next/navigation';
-import { NewSessionForm } from './NewSessionForm';
+import AttendanceRoster from './AttendanceRoster';
+import { saveAttendance } from './actions';
 
 export default async function NewSessionPage() {
   const supabase = await createClient();
@@ -12,22 +13,28 @@ export default async function NewSessionPage() {
     redirect('/login');
   }
 
-  const coachBatches = await prisma.batch.findMany({
+  // Fetch all players for locations the coach has access to and group by location
+  const locationPlayers = await prisma.player.findMany({
     where: {
       location: {
         coachLocations: { some: { user_id: user.id } }
       }
     },
-    include: { location: true, players: true }
+    include: { location: true },
+    orderBy: { first_name: 'asc' },
   });
 
-  const batches = coachBatches.map(batch => ({
-    id: batch.id,
-    name: batch.name,
-    locationId: batch.location_id,
-    locationName: batch.location.name,
-    playerCount: batch.players.length,
-  }));
+  const playersByLocationMap = new Map();
+  locationPlayers.forEach(p => {
+    const locId = p.location_id;
+    const locName = p.location?.name || 'Unknown';
+    if (!playersByLocationMap.has(locId)) {
+      playersByLocationMap.set(locId, { locationId: locId, locationName: locName, players: [] });
+    }
+    playersByLocationMap.get(locId).players.push({ id: p.id, firstName: p.first_name, lastName: p.last_name });
+  });
+
+  const playersByLocation = Array.from(playersByLocationMap.values());
 
   return (
     <>
@@ -41,7 +48,7 @@ export default async function NewSessionPage() {
       <div className="bg-slate-50 text-slate-900 antialiased min-h-screen font-sans">
         <div className="max-w-[448px] mx-auto min-h-screen bg-slate-50 flex flex-col relative pb-32">
       {/* TopAppBar */}
-      <header className="flex items-center justify-between px-4 h-16 w-full sticky top-0 z-50 bg-white border-b border-slate-200 shadow-sm">
+      <header className="flex items-center justify-between px-4 h-16 w-full sticky top-0 z-50 bg-white border-b border-black/10 shadow-sm">
         <div className="flex items-center gap-4 w-full">
           <Link 
             href="/coach" 
@@ -54,7 +61,7 @@ export default async function NewSessionPage() {
         </div>
       </header>
 
-      <NewSessionForm batches={batches} />
+      <AttendanceRoster playersByLocation={playersByLocation} onSave={saveAttendance} />
     </div>
     </div>
     </>
