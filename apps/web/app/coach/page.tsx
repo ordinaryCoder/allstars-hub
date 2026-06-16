@@ -159,7 +159,7 @@ function CreateSessionCard({ sessionCount }: { sessionCount: number }) {
         </div>
         <a href="/coach/new-session" className="relative z-10 w-full bg-white text-slate-900 text-sm font-medium py-3 rounded-xl flex items-center justify-center gap-2 active:scale-95 transition-transform hover:bg-slate-50">
           <span className="material-symbols-outlined text-[20px]">add_circle</span>
-          New Session
+          Mark Attendance
         </a>
         <div className="absolute -right-8 -bottom-8 opacity-10 group-hover:opacity-20 transition-opacity pointer-events-none">
           <span className="material-symbols-outlined text-[140px]" style={{ fontVariationSettings: "'FILL' 1" }}>sports_soccer</span>
