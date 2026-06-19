@@ -53,31 +53,25 @@ export async function addCoachAdmin(formData: FormData) {
   const { data: authData, error: authError } = await supabaseAdmin.auth.signUp({
     email,
     password: tempPassword,
+    options: {
+      data: {
+        isFromAdmin: true,
+        role: 'coach',
+        first_name: firstName,
+        last_name: lastName,
+        mobile_number: mobileNumber,
+        location_id: locationId
+      }
+    }
   });
 
   if (authError || !authData?.user) {
     return { error: authError?.message ?? 'Unable to create auth account for coach' };
   }
 
-  await prisma.user.create({
-    data: {
-      id: authData.user.id,
-      email,
-      first_name: firstName,
-      last_name: lastName,
-      mobile_number: mobileNumber,
-      status: 'ACTIVE',
-      academy_roles: {
-        create: { 
-          academy_id: academy.id,
-          permissions: ['coach'] 
-        }
-      },
-      coachLocations: {
-        create: { location_id: locationId }
-      }
-    }
-  });
+  await prisma.coachLocation.create({
+    data: { user_id: authData.user.id, location_id: locationId }
+  })
 
   revalidatePath('/admin');
   return { success: true };

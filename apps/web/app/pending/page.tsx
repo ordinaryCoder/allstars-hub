@@ -1,11 +1,12 @@
 import Link from 'next/link'
 
-export default function PendingApprovalPage({
+export default async function PendingApprovalPage({
   searchParams,
 }: {
-    searchParams: { email?: string }
+    searchParams: Promise<{ email?: string }>
 }) {
-  const email = searchParams.email || 'your account'
+  const params = await searchParams;
+  const email = params.email || 'your account'
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4">

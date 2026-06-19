@@ -41,78 +41,38 @@ export async function signup(formData: FormData, isFromAdmin = false) {
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
-    const { data, error } = await supabaseAdmin.auth.signUp({ email, password });
+    const { data, error } = await supabaseAdmin.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          isFromAdmin: true,
+          role,
+          first_name: role === 'parent' ? guardianName : firstName,
+          last_name: lastName,
+          mobile_number: mobileNumber,
+          location_id: locationId,
+          dob: dob,
+          player_first_name: role === 'parent' ? firstName : undefined,
+          player_last_name: role === 'parent' ? lastName : undefined,
+        },
+      },
+    });
     authData = data;
     authError = error;
   } else {
     const supabase = await createClient();
-    const { data, error } = await supabase.auth.signUp({ email, password });
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { role, first_name: firstName, last_name: lastName, mobile_number: mobileNumber, location_id: locationId, dob: dob } },
+    });
     authData = data;
     authError = error;
   }
 
   if (authError || !authData?.user) {
     return { error: authError?.message ?? 'Unable to create account' }
-  }
-
-  try {
-    if (role === 'parent') {
-      await prisma.user.create({
-        data: {
-          id: authData.user.id,
-          email,
-          first_name: guardianName,
-          last_name: lastName, // last_name is required in the Prisma schema, so we pass an empty string
-          mobile_number: mobileNumber,
-          status: isFromAdmin ? 'ACTIVE' : 'PENDING',
-          academy_roles: {
-            create: { academy_id: academy.id, permissions: ['parent'] },
-          },
-          parent_of: {
-            create: {
-              player: {
-                create: {
-                  academy_id: academy.id,
-                  location_id: locationId,
-                  first_name: firstName,
-                  last_name: lastName,
-                  dob: new Date(dob),
-                }
-              }
-            }
-          }
-        },
-      });
-    } else {
-      await prisma.user.create({
-        data: {
-          id: authData.user.id,
-          email,
-          first_name: firstName,
-          last_name: lastName,
-          mobile_number: mobileNumber,
-          status: isFromAdmin ? 'ACTIVE' : 'PENDING',
-          academy_roles: {
-            create: { academy_id: academy.id, permissions: ['player'] },
-          },
-        },
-      });
-
-      await prisma.player.create({
-        data: {
-          academy_id: academy.id,
-          location_id: locationId,
-          user_id: authData.user.id,
-          first_name: firstName,
-          last_name: lastName,
-          dob: new Date(dob),
-        }
-      });
-    }
-    console.log("Signup request saved for user:", email)
-  } catch (error) {
-    console.error('Signup DB error:', error)
-    return { error: 'Unable to save signup request' }
   }
 
   if (!isFromAdmin) {

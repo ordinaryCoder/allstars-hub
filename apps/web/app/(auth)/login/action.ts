@@ -39,6 +39,10 @@ export async function login(prevState: any, formData: FormData): Promise<{ error
     password,
   })
 
+  if (authError?.message === 'Email not confirmed') {
+    return { error: 'Email not confirmed. Please check your inbox.' };
+  }
+
   if (authError || !authData.session) {
     return { error: 'Invalid username or password' }
   }
