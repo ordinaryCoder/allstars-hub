@@ -40,7 +40,7 @@ export async function login(prevState: any, formData: FormData): Promise<{ error
   })
 
   if (authError?.message === 'Email not confirmed') {
-    return { error: 'Email not confirmed. Please check your inbox.' };
+    redirect(`/confirm-email?email=${encodeURIComponent(email)}`)
   }
 
   if (authError || !authData.session) {
@@ -73,5 +73,5 @@ export async function login(prevState: any, formData: FormData): Promise<{ error
   else if (cleanRoles.includes('admin')) targetRoute = '/admin';
   else if (cleanRoles.includes('player') || cleanRoles.includes('parent')) targetRoute = '/player';
 
-  redirect(targetRoute)
+  return redirect(targetRoute)
 }
