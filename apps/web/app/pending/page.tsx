@@ -1,4 +1,6 @@
 import Link from 'next/link'
+import { createClient } from '../../lib/server'
+import { redirect } from 'next/navigation'
 
 export default async function PendingApprovalPage({
   searchParams,
@@ -7,6 +9,13 @@ export default async function PendingApprovalPage({
 }) {
   const params = await searchParams;
   const email = params.email || 'your account'
+
+  async function signOut() {
+    'use server'
+    const supabase = await createClient()
+    await supabase.auth.signOut()
+    redirect('/login')
+  }
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4">
@@ -19,12 +28,14 @@ export default async function PendingApprovalPage({
           An administrator will approve your access shortly. If you need help, please contact support.
         </p>
         <div className="space-y-3">
-          <Link
-            href="/login"
-            className="block w-full h-14 bg-black text-white rounded-xl font-semibold text-lg hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center shadow-sm"
-          >
-            Return to Login
-          </Link>
+          <form action={signOut} >
+            <button
+              type="submit"
+              className="block w-full h-14 bg-black text-white rounded-xl font-semibold text-lg hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center shadow-sm"
+            >
+              Return to Login
+            </button>
+          </form>
           <a
             href="mailto:support@example.com"
             className="block text-sm text-gray-700 hover:text-gray-900"

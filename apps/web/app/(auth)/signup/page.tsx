@@ -15,6 +15,7 @@ export default function SignupPage() {
   const router = useRouter();
   const [role, setRole] = useState("parent");
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [guardianName, setGuardianName] = useState("");
@@ -110,9 +111,11 @@ export default function SignupPage() {
   const handleSignup = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
+    setIsLoading(true);
 
     if (!validateSignupForm()) {
-      return;
+      setIsLoading(false);
+      return
     }
 
     const formData = new FormData(e.currentTarget);
@@ -134,12 +137,19 @@ export default function SignupPage() {
       if (res?.error) {
         setError(res.error);
       } else if (res?.success) {
-        router.push(`/pending?email=${encodeURIComponent(res.email!)}`);
+          console.log("Signup successful:", res);
+        // if (res.emailConfirmationRequired) {
+          router.push(`/confirm-email?email=${encodeURIComponent(res.email!)}`);
+        // } else {
+          // router.push(`/pending?email=${encodeURIComponent(res.email!)}`);
+        // }
       }
     } catch (err: unknown) {
       setError(
         err instanceof Error ? err.message : "Unable to complete signup",
       );
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -424,9 +434,10 @@ export default function SignupPage() {
 
           <button
             type="submit"
-            className="mt-4 w-full h-14 bg-black text-white rounded-xl font-semibold text-lg hover:opacity-90 hover:shadow-md active:scale-[0.98] transition-all flex items-center justify-center shadow-sm"
+            disabled={isLoading}
+            className="mt-4 w-full h-14 bg-black text-white rounded-xl font-semibold text-lg hover:opacity-90 hover:shadow-md active:scale-[0.98] transition-all flex items-center justify-center shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Sign Up
+            {isLoading ? "Signing Up..." : "Sign Up"}
           </button>
 
           <p className="mt-4 text-center text-sm text-gray-600">
