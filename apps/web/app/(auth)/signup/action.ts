@@ -77,7 +77,7 @@ async function validateSignupData(formData: FormData, isFromAdmin: boolean) {
   return { error: null };
 }
 
-export async function signup(formData: FormData, isFromAdmin = false) {
+export async function signup(formData: FormData, isFromAdmin = false): Promise<{ success: false; error: string } | { success: true; email: string }> {
   const email = formData.get("email")?.toString().trim() ?? "";
   let password = formData.get("password")?.toString() ?? "";
   const firstName = formData.get("firstName")?.toString().trim() ?? "";
@@ -92,7 +92,7 @@ export async function signup(formData: FormData, isFromAdmin = false) {
 
   const validationResult = await validateSignupData(formData, isFromAdmin);
   if (validationResult.error) {
-    return validationResult;
+    return { success: false, error: validationResult.error };
   }
 
   if (isFromAdmin && !password) {
@@ -105,7 +105,7 @@ export async function signup(formData: FormData, isFromAdmin = false) {
   });
 
   if (!academy) {
-    return { error: "No active academy available" };
+    return { success: false, error: "No active academy available" };
   }
 
   let authData;
@@ -157,12 +157,14 @@ export async function signup(formData: FormData, isFromAdmin = false) {
   }
 
   if (authError || !authData?.user) {
-    return { error: authError?.message ?? "Unable to create account" };
+    return { success: false, error: authError?.message ?? "Unable to create account" };
   }
 
   if (!isFromAdmin) {
     return { success: true, email };
   }
+
+  return { success: true, email };
 }
 
 export async function getLocations() {

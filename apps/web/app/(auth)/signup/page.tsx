@@ -118,13 +118,14 @@ export default function SignupPage() {
 
     try {
       const res = await signup(formData);
-      if (res?.error) {
+      // Todo: Refactor
+      if (!res.success) {
         setError(res.error);
-      } else if (res?.success) {
+      } else {
         // if (res.emailConfirmationRequired) {
-          router.push(`/confirm-email?email=${encodeURIComponent(res.email!)}`);
+        router.push(`/confirm-email?email=${encodeURIComponent(res.email)}`);
         // } else {
-          // router.push(`/pending?email=${encodeURIComponent(res.email!)}`);
+        // router.push(`/pending?email=${encodeURIComponent(res.email!)}`);
         // }
       }
     } catch (err: unknown) {
