@@ -39,6 +39,10 @@ export async function login(prevState: any, formData: FormData): Promise<{ error
     password,
   })
 
+  if (authError?.message === 'Email not confirmed') {
+    redirect(`/confirm-email?email=${encodeURIComponent(email)}`)
+  }
+
   if (authError || !authData.session) {
     return { error: 'Invalid username or password' }
   }
@@ -69,5 +73,5 @@ export async function login(prevState: any, formData: FormData): Promise<{ error
   else if (cleanRoles.includes('admin')) targetRoute = '/admin';
   else if (cleanRoles.includes('player') || cleanRoles.includes('parent')) targetRoute = '/player';
 
-  redirect(targetRoute)
+  return redirect(targetRoute)
 }
