@@ -11,9 +11,9 @@ const indianMobileRegex = /^[6-9]\d{9}$/;
 const normalizeIndianMobile = (value: string) =>
   value.replace(/\D/g, "").slice(0, 10);
 
-export async function signup(formData: FormData, isFromAdmin = false) {
+async function validateSignupData(formData: FormData, isFromAdmin: boolean) {
   const email = formData.get("email")?.toString().trim() ?? "";
-  let password = formData.get("password")?.toString() ?? "";
+  const password = formData.get("password")?.toString() ?? "";
   const firstName = formData.get("firstName")?.toString().trim() ?? "";
   const lastName = formData.get("lastName")?.toString().trim() ?? "";
   const mobileNumber = normalizeIndianMobile(
@@ -23,17 +23,10 @@ export async function signup(formData: FormData, isFromAdmin = false) {
   const guardianName = formData.get("guardianName")?.toString().trim() ?? "";
   const dob = formData.get("dob")?.toString() ?? "";
   const locationId = formData.get("locationId")?.toString() ?? "";
-  const emergencyContact = normalizeIndianMobile(
-    formData.get("emergencyContact")?.toString() ?? "",
-  );
-
-  if (isFromAdmin && !password) {
-    password = Math.random().toString(36).slice(-8) + "X1!";
-  }
 
   if (
     !email ||
-    !password ||
+    (!password && !isFromAdmin) ||
     !firstName ||
     !lastName ||
     !mobileNumber ||
@@ -66,13 +59,6 @@ export async function signup(formData: FormData, isFromAdmin = false) {
     };
   }
 
-  if (role === "player" && !indianMobileRegex.test(emergencyContact)) {
-    return {
-      error:
-        "Please enter a valid 10-digit Indian emergency contact number starting with 6, 7, 8, or 9",
-    };
-  }
-
   const [year, month, day] = dob.split("-").map(Number);
   const birthDate = new Date(year, month - 1, day);
   const minimumAllowedDate = new Date();
@@ -86,6 +72,31 @@ export async function signup(formData: FormData, isFromAdmin = false) {
     birthDate.getDate() !== day
   ) {
     return { error: "Date of birth must be at least 6 years old" };
+  }
+
+  return { error: null };
+}
+
+export async function signup(formData: FormData, isFromAdmin = false) {
+  const email = formData.get("email")?.toString().trim() ?? "";
+  let password = formData.get("password")?.toString() ?? "";
+  const firstName = formData.get("firstName")?.toString().trim() ?? "";
+  const lastName = formData.get("lastName")?.toString().trim() ?? "";
+  const mobileNumber = normalizeIndianMobile(
+    formData.get("mobileNumber")?.toString() ?? "",
+  );
+  const role = formData.get("role")?.toString() ?? "parent";
+  const guardianName = formData.get("guardianName")?.toString().trim() ?? "";
+  const dob = formData.get("dob")?.toString() ?? "";
+  const locationId = formData.get("locationId")?.toString() ?? "";
+
+  const validationResult = await validateSignupData(formData, isFromAdmin);
+  if (validationResult.error) {
+    return validationResult;
+  }
+
+  if (isFromAdmin && !password) {
+    password = Math.random().toString(36).slice(-8) + "X1!";
   }
 
   const academy = await prisma.academy.findFirst({
@@ -113,13 +124,12 @@ export async function signup(formData: FormData, isFromAdmin = false) {
         data: {
           isFromAdmin: true,
           role,
-          first_name: role === "parent" ? guardianName : firstName,
+          guardian_name: role === "parent" ? guardianName : undefined,
+          first_name: firstName,
           last_name: lastName,
           mobile_number: mobileNumber,
           location_id: locationId,
           dob: dob,
-          player_first_name: role === "parent" ? firstName : undefined,
-          player_last_name: role === "parent" ? lastName : undefined,
         },
       },
     });
@@ -133,6 +143,7 @@ export async function signup(formData: FormData, isFromAdmin = false) {
       options: {
         data: {
           role,
+          guardian_name: role === "parent" ? guardianName : undefined,
           first_name: firstName,
           last_name: lastName,
           mobile_number: mobileNumber,

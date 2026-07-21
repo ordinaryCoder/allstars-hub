@@ -7,17 +7,9 @@ export function BottomNavBar({ currentTab }: { currentTab: string }) {
         <span className="material-symbols-outlined" style={{ fontVariationSettings: currentTab === 'home' ? "'FILL' 1" : "'FILL' 0" }}>home</span>
         <span className="text-[11px] font-medium mt-1">Home</span>
       </Link>
-      <Link href="/admin?tab=reports" className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all ${currentTab === 'reports' ? 'text-slate-900 bg-slate-100' : 'text-slate-500 hover:bg-slate-50'}`}>
-        <span className="material-symbols-outlined" style={{ fontVariationSettings: currentTab === 'reports' ? "'FILL' 1" : "'FILL' 0" }}>analytics</span>
-        <span className="text-[11px] font-medium mt-1">Reports</span>
-      </Link>
       <Link href="/admin?tab=users" className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all ${currentTab === 'users' ? 'text-slate-900 bg-slate-100' : 'text-slate-500 hover:bg-slate-50'}`}>
         <span className="material-symbols-outlined" style={{ fontVariationSettings: currentTab === 'users' ? "'FILL' 1" : "'FILL' 0" }}>group</span>
         <span className="text-[11px] font-medium mt-1">Users</span>
-      </Link>
-      <Link href="/admin?tab=settings" className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all ${currentTab === 'settings' ? 'text-slate-900 bg-slate-100' : 'text-slate-500 hover:bg-slate-50'}`}>
-        <span className="material-symbols-outlined" style={{ fontVariationSettings: currentTab === 'settings' ? "'FILL' 1" : "'FILL' 0" }}>settings</span>
-        <span className="text-[11px] font-medium mt-1">Settings</span>
       </Link>
     </nav>
   )

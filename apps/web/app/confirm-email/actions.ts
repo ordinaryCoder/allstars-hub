@@ -9,8 +9,6 @@ export async function resendConfirmationEmail(email: string) {
   
   const supabase = await createClient()
 
-  console.log("Resending confirmation email for:", email);
-
   const { error } = await supabase.auth.resend({
     type: "signup",
     email: email,

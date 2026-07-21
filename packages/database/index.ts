@@ -13,7 +13,7 @@ dotenv.config();
 const databaseUrl = env("DATABASE_URL");
 
 if (!databaseUrl) {
-  throw new Error("DATABASE_URL is missing. Next.js is not loading the monorepo root .env file.");
+  throw new Error("DATABASE_URL is missing. Next.js is not loading the root .env file.");
 }
 
 const pool = new Pool({

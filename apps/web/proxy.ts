@@ -39,7 +39,7 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   // This will refresh the session if it's expired
   const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user && !request.nextUrl.pathname.startsWith('/login') && !request.nextUrl.pathname.startsWith('/signup') && !request.nextUrl.pathname.startsWith('/contactus') && !request.nextUrl.pathname.startsWith('/pending')) {
+  if (!user && !request.nextUrl.pathname.startsWith('/login') && !request.nextUrl.pathname.startsWith('/signup') && !request.nextUrl.pathname.startsWith('/contactus') && !request.nextUrl.pathname.startsWith('/pending') && !request.nextUrl.pathname.startsWith('/confirm-email')) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     const redirectResponse = NextResponse.redirect(url)

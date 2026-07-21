@@ -137,13 +137,6 @@ export function QuickActions({ locations = [], batches = [] }: { locations?: any
                   <input name="mobileNumber" type="tel" required placeholder="+1 (555) 000-0000" className="w-full h-12 px-4 bg-white border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-slate-900 outline-none" />
                 </div>
 
-                {role === 'player' && (
-                  <div className="flex flex-col gap-1">
-                    <label className="text-sm font-medium text-slate-900">Emergency Contact Number</label>
-                    <input name="emergencyContact" type="tel" required className="w-full h-12 px-4 bg-white border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-slate-900 outline-none" />
-                  </div>
-                )}
-
                 <DobInput
                   id="dob"
                   name="dob"

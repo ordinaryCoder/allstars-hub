@@ -1,10 +1,10 @@
 "use client";
 
 import { AcademyLogo } from "@/components/ui/icons";
-import { redirect, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useState, useTransition, useEffect } from "react";
 import { resendConfirmationEmail } from "./actions";
-import { createClient } from "@/lib/server";
+import { signOut } from "../actions";
 
 export default function ConfirmEmailPage() {
   const searchParams = useSearchParams();
@@ -43,13 +43,6 @@ export default function ConfirmEmailPage() {
       }
     });
   };
-
-  async function signOut() {
-    'use server'
-    const supabase = await createClient()
-    await supabase.auth.signOut()
-    redirect('/login')
-  }
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4">
@@ -106,7 +99,7 @@ export default function ConfirmEmailPage() {
                 : "Resend"}
           </button>
 
-          <form action={signOut} >
+          <form action={signOut} className="w-full">
             <button
               type="submit"
               className="block w-full h-14 bg-black text-white rounded-xl font-semibold text-lg hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center shadow-sm"

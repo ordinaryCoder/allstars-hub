@@ -21,7 +21,6 @@ export default function SignupPage() {
   const [guardianName, setGuardianName] = useState("");
   const [email, setEmail] = useState("");
   const [mobileNumber, setMobileNumber] = useState("");
-  const [emergencyContact, setEmergencyContact] = useState("");
   const [dob, setDob] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -42,7 +41,6 @@ export default function SignupPage() {
     const trimmedGuardianName = guardianName.trim();
     const trimmedEmail = email.trim().toLowerCase();
     const normalizedMobileNumber = normalizePhoneValue(mobileNumber);
-    const normalizedEmergencyContact = normalizePhoneValue(emergencyContact);
 
     if (
       !trimmedFirstName ||
@@ -73,13 +71,6 @@ export default function SignupPage() {
     if (!/^[6-9]\d{9}$/.test(normalizedMobileNumber)) {
       setError(
         "Please enter a valid 10-digit Indian mobile number starting with 6, 7, 8, or 9.",
-      );
-      return false;
-    }
-
-    if (role === "player" && !/^[6-9]\d{9}$/.test(normalizedEmergencyContact)) {
-      setError(
-        "Please enter a valid 10-digit Indian emergency contact number starting with 6, 7, 8, or 9.",
       );
       return false;
     }
@@ -119,25 +110,17 @@ export default function SignupPage() {
     }
 
     const formData = new FormData(e.currentTarget);
-    const normalizedMobileNumber = normalizePhoneValue(mobileNumber);
-    const normalizedEmergencyContact = normalizePhoneValue(emergencyContact);
 
     formData.set("firstName", firstName.trim());
     formData.set("lastName", lastName.trim());
     formData.set("guardianName", guardianName.trim());
     formData.set("email", email.trim().toLowerCase());
-    formData.set("mobileNumber", normalizedMobileNumber);
-
-    if (role === "player") {
-      formData.set("emergencyContact", normalizedEmergencyContact);
-    }
 
     try {
       const res = await signup(formData);
       if (res?.error) {
         setError(res.error);
       } else if (res?.success) {
-          console.log("Signup successful:", res);
         // if (res.emailConfirmationRequired) {
           router.push(`/confirm-email?email=${encodeURIComponent(res.email!)}`);
         // } else {
@@ -326,39 +309,6 @@ export default function SignupPage() {
               Enter only the 10-digit Indian mobile number.
             </p>
           </div>
-
-          {role === "player" && (
-            <div className="flex flex-col gap-1">
-              <label
-                className="text-sm font-medium text-gray-900"
-                htmlFor="emergencyContact"
-              >
-                Emergency Contact Number
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 flex items-center px-3 border-r border-gray-300 text-sm font-medium text-gray-600 bg-gray-50 rounded-l-xl">
-                  +91
-                </div>
-                <input
-                  id="emergencyContact"
-                  name="emergencyContact"
-                  type="tel"
-                  inputMode="numeric"
-                  maxLength={10}
-                  required
-                  value={emergencyContact}
-                  onChange={(e) =>
-                    setEmergencyContact(normalizePhoneValue(e.target.value))
-                  }
-                  placeholder="9876543210"
-                  className="w-full h-12 pl-16 pr-4 bg-white border border-gray-300 rounded-xl text-base text-gray-900 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
-                />
-              </div>
-              <p className="text-xs text-gray-500">
-                Enter only the 10-digit Indian emergency contact number.
-              </p>
-            </div>
-          )}
 
           <div className="flex flex-col gap-1">
             <label
