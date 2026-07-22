@@ -13,14 +13,14 @@ function generateTempPassword() {
   return Math.random().toString(36).slice(-8) + 'X1!';
 }
 
-export async function addPlayerAdmin(formData: FormData) {
+export async function addPlayerAdmin(formData: FormData): Promise<{ success: false; error: string } | { success: true }> {
   const res = await signup(formData, true);
-  if (res?.error) return { error: res.error };
+  if (!res.success) return { success: false, error: res.error };
   revalidatePath('/admin');
   return { success: true };
 }
 
-export async function addCoachAdmin(formData: FormData) {
+export async function addCoachAdmin(formData: FormData): Promise<{ success: false; error: string } | { success: true }> {
   const email = formData.get('email')?.toString().trim() || '';
   const firstName = formData.get('firstName')?.toString().trim() || '';
   const lastName = formData.get('lastName')?.toString().trim() || '';
@@ -31,7 +31,7 @@ export async function addCoachAdmin(formData: FormData) {
   const batchIds = batchIdsString ? batchIdsString.split(',') : [];
 
   if (!email || !firstName || !lastName || !mobileNumber || !locationId) {
-    return { error: 'Please fill in all required fields' };
+    return { success: false as const, error: 'Please fill in all required fields' };
   }
 
   const academy = await prisma.academy.findFirst({
@@ -40,7 +40,7 @@ export async function addCoachAdmin(formData: FormData) {
   });
 
   if (!academy) {
-    return { error: 'No active academy available' };
+    return { success: false as const, error: 'No active academy available' };
   }
 
   const tempPassword = generateTempPassword();
@@ -66,7 +66,7 @@ export async function addCoachAdmin(formData: FormData) {
   });
 
   if (authError || !authData?.user) {
-    return { error: authError?.message ?? 'Unable to create auth account for coach' };
+    return { success: false as const, error: authError?.message ?? 'Unable to create auth account for coach' };
   }
 
   await prisma.coachLocation.create({

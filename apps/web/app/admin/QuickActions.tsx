@@ -21,7 +21,7 @@ export function QuickActions({ locations = [], batches = [] }: { locations?: any
     
     startTransition(async () => {
       const res = await addPlayerAdmin(formData);
-      if (res?.error) {
+      if (!res.success) {
         showSnackbar({ message: res.error, type: 'error' });
       } else {
         setModal('none');
@@ -37,7 +37,7 @@ export function QuickActions({ locations = [], batches = [] }: { locations?: any
     formData.append('batchIds', selectedBatches.join(','));
     startTransition(async () => {
       const res = await addCoachAdmin(formData);
-      if (res?.error) {
+      if (!res.success) {
         showSnackbar({ message: res.error, type: 'error' });
       } else {
         setModal('none');
