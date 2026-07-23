@@ -82,7 +82,3 @@ cd packages/supabase
 supabase link --project-ref <your-project-id>
 supabase db push --linked
 
-### Topics to Explore
-* Vercel deployment commands
-* Handling `.env` variables across workspaces
-* Seeding local databases with test data
