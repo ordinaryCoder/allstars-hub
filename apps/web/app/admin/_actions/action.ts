@@ -1,8 +1,8 @@
 'use server';
 
-import { prisma } from '../../../../packages/database';
+import { prisma } from '../../../../../packages/database';
 import { revalidatePath } from 'next/cache';
-import { signup } from '../(auth)/signup/action';
+import { signup } from '@/app/(auth)/signup/_actions/action';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 
 /**

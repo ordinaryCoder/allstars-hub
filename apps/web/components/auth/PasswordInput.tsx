@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { VisibilityIcon, VisibilityOffIcon } from '../../../components/ui/icons';
+import { VisibilityIcon, VisibilityOffIcon } from '@/components/icons';
 
 interface PasswordInputProps {
   id?: string;

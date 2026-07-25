@@ -3,17 +3,17 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { signup, getLocations } from './action';
+import { signup, getLocations } from './_actions/action';
 import { ACADEMY_NAME } from '@/lib/constant';
-import { DobInput } from './DobInput';
-import { AuthLayoutContainer } from '../components/AuthLayoutContainer';
-import { PasswordInput } from '../components/PasswordInput';
+import { DobInput } from './_components/DobInput';
+import { AuthLayoutContainer } from '@/components/auth/AuthLayoutContainer';
+import { PasswordInput } from '@/components/auth/PasswordInput';
 import {
   validateSignupData,
   normalizeIndianMobile,
   type SignupInputData,
-} from '../utils/validation';
-import type { LocationOption } from '../types';
+} from '@/lib/validations/signup';
+import type { LocationOption } from '@/types/auth';
 
 export default function SignupPage() {
   const router = useRouter();

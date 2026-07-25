@@ -2,9 +2,9 @@
 
 import { useState, useActionState, useEffect } from 'react';
 import Link from 'next/link';
-import { login } from './action';
-import { AuthLayoutContainer } from '../components/AuthLayoutContainer';
-import { PasswordInput } from '../components/PasswordInput';
+import { login } from './_actions/action';
+import { AuthLayoutContainer } from '@/components/auth/AuthLayoutContainer';
+import { PasswordInput } from '@/components/auth/PasswordInput';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');

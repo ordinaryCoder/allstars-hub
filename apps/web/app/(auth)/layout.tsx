@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { createClient } from '../../lib/server';
+import { createClient } from '@/lib/server';
 
 export default async function AuthLayout({
   children,

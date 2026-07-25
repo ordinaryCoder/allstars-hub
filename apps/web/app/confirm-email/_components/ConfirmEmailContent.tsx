@@ -1,13 +1,14 @@
 "use client";
 
-import { AcademyLogo } from "@/components/ui/icons";
-import { useSearchParams } from "next/navigation";
+import { AcademyLogo } from "@/components/icons";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useState, useTransition, useEffect } from "react";
-import { resendConfirmationEmail } from "./actions";
-import { signOut } from "../actions";
+import { resendConfirmationEmail } from "../_actions/action";
+import { signOut } from "../_actions/action";
 
 export default function ConfirmEmailContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const emailFromParams = searchParams.get("email");
   const email = emailFromParams ? decodeURIComponent(emailFromParams) : null;
 
@@ -33,7 +34,11 @@ export default function ConfirmEmailContent() {
     }
     startTransition(async () => {
       const result = await resendConfirmationEmail(email);
-      if (result?.error) {
+      if ('alreadyConfirmed' in result && result.alreadyConfirmed) {
+        router.push(`/pending?email=${encodeURIComponent(email)}`);
+        return;
+      }
+      if ('error' in result && result.error) {
         setError(result.error);
         setMessage(null);
       } else {

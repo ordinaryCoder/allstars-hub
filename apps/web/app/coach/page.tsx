@@ -2,9 +2,9 @@ import { createClient } from '../../lib/server';
 import { redirect } from 'next/navigation';
 import { requireRole } from '../../lib/dal';
 import { ACADEMY_NAME } from '@/lib/constant';
-import { TodaySessions } from './TodaySessions';
+import { TodaySessions } from './_components/TodaySessions';
 import { prisma } from '../../../../packages/database';
-import { PerformanceTrack } from './PerformanceTrack';
+import { PerformanceTrack } from './_components/PerformanceTrack';
 
 export default async function DashboardPage() {
   const supabase = await createClient();

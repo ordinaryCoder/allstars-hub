@@ -1,4 +1,4 @@
-import { updateProfile } from './action';
+import { updateProfile } from '../_actions/action';
 
 export function PlayerProfile({ userDetails, playerDetails }: { userDetails: any; playerDetails?: any }) {
   return (

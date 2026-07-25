@@ -3,7 +3,7 @@ import { createClient } from '../../../lib/server';
 import { prisma } from '../../../../../packages/database';
 import { redirect } from 'next/navigation';
 import { requireRole } from '../../../lib/dal';
-import DateFilterDropdown from './DateFilterDropdown';
+import DateFilterDropdown from './_components/DateFilterDropdown';
 
 export default async function AttendanceReportPage({
   searchParams,

@@ -1,14 +1,14 @@
 'use server';
 
-import { createClient } from '../../../lib/server';
+import { createClient } from '@/lib/server';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
-import { prisma } from '../../../../../packages/database';
+import { prisma } from '../../../../../../packages/database';
 import {
   validateSignupData,
   normalizeIndianMobile,
   type SignupInputData,
-} from '../utils/validation';
-import type { SignupState, LocationOption } from '../types';
+} from '@/lib/validations/signup';
+import type { SignupState, LocationOption } from '@/types/auth';
 
 export async function signup(
   formData: FormData,
@@ -74,6 +74,7 @@ export async function signup(
       email,
       password,
       options: {
+        emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/api/auth/callback`,
         data: {
           isFromAdmin: true,
           role,
@@ -94,6 +95,7 @@ export async function signup(
       email,
       password,
       options: {
+        emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/api/auth/callback`,
         data: {
           role,
           guardian_name: role === 'parent' ? guardianName : undefined,

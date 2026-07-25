@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { AcademyLogo } from '../../../components/ui/icons';
+import { AcademyLogo } from '@/components/icons';
 
 interface AuthLayoutContainerProps {
   title: string;

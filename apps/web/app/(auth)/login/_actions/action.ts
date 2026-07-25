@@ -1,8 +1,8 @@
 'use server';
 
-import { createClient } from '../../../lib/server';
+import { createClient } from '@/lib/server';
 import { redirect } from 'next/navigation';
-import type { UserRole, RedirectPath, LoginState, JWTPayload } from '../types';
+import type { UserRole, RedirectPath, LoginState, JWTPayload } from '@/types/auth';
 
 function parseJWTPayload(token: string): JWTPayload | null {
   try {

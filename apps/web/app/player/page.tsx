@@ -1,11 +1,11 @@
-import { TopAppBar } from './TopAppBar';
-import { NextCoachingSession } from './NextCoachingSession';
-import { AttendanceHealth } from './AttendanceHealth';
-import { CalendarWidget } from './CalendarWidget';
-import { BottomNav } from './BottomNav';
-import { createClient } from '../../lib/server';
+import { TopAppBar } from '@/components/layout/TopAppBar';
+import { NextCoachingSession } from './_components/NextCoachingSession';
+import { AttendanceHealth } from './_components/AttendanceHealth';
+import { CalendarWidget } from './_components/CalendarWidget';
+import { BottomNav } from '@/components/layout/BottomNav';
+import { createClient } from '@/lib/server';
 import { redirect } from 'next/navigation';
-import { requireRole } from '../../lib/dal';
+import { requireRole } from '@/lib/dal';
 import { prisma } from '../../../../packages/database';
 
 export default async function PlayerPage() {

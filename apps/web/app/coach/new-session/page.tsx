@@ -2,8 +2,8 @@ import Link from 'next/link';
 import { createClient } from '../../../lib/server';
 import { prisma } from '../../../../../packages/database';
 import { redirect } from 'next/navigation';
-import AttendanceRoster from './AttendanceRoster';
-import { saveAttendance } from './actions';
+import AttendanceRoster from './_components/AttendanceRoster';
+import { saveAttendance } from './_actions/action';
 
 export default async function NewSessionPage() {
   const supabase = await createClient();

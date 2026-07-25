@@ -1,11 +1,11 @@
-﻿import { createClient } from '../../lib/server'
+import { createClient } from '@/lib/server'
 import { redirect } from 'next/navigation'
-import { requireRole } from '../../lib/dal'
+import { requireRole } from '@/lib/dal'
 import { prisma } from '../../../../packages/database'
-import { UserManagementBoard } from './UserManagementBoard'
-import { TopAppBar } from '../player/TopAppBar'
-import { HomeTab } from './HomeTab'
-import { BottomNavBar } from './BottomNavBar'
+import { UserManagementBoard } from './_components/UserManagementBoard'
+import { TopAppBar } from '@/components/layout/TopAppBar'
+import { HomeTab } from './_components/HomeTab'
+import { BottomNavBar } from './_components/BottomNavBar'
 
 // TODO: Check data mapping to schema and modify schema to fit data need in UI
 export default async function AdminPage({

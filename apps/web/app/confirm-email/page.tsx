@@ -1,5 +1,7 @@
 import { Suspense } from "react";
-import ConfirmEmailContent from "./ConfirmEmailContent";
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/server";
+import ConfirmEmailContent from "./_components/ConfirmEmailContent";
 
 function LoadingFallback() {
   return (
@@ -16,7 +18,18 @@ function LoadingFallback() {
   );
 }
 
-export default function ConfirmEmailPage() {
+export default async function ConfirmEmailPage() {
+  // If the user has a session and their email is already confirmed,
+  // there is nothing to do here — send them to the pending approval page.
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (user?.email_confirmed_at) {
+    redirect(`/pending?email=${encodeURIComponent(user.email ?? "")}`);
+  }
+
   return (
     <Suspense fallback={<LoadingFallback />}>
       <ConfirmEmailContent />

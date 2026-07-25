@@ -1,4 +1,4 @@
-import { AcademyLogo } from '../../components/ui/icons';
+import { AcademyLogo } from '@/components/icons';
 import Link from 'next/link';
 
 export default function ContactUsPage() {

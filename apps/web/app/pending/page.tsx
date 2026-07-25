@@ -1,3 +1,6 @@
+import { redirect } from 'next/navigation'
+import { createClient } from '@/lib/server'
+import { prisma } from '../../../../packages/database'
 import { signOut } from '../actions'
 
 export default async function PendingApprovalPage({
@@ -5,8 +8,29 @@ export default async function PendingApprovalPage({
 }: {
   searchParams: Promise<{ email?: string }>
 }) {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  // No session → nothing to wait for, go to login
+  if (!user) {
+    redirect('/login')
+  }
+
+  // If the admin has already approved this user, send them to login
+  // so they pick up a fresh JWT with their roles.
+  const dbUser = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: { status: true },
+  })
+
+  if (dbUser?.status === 'ACTIVE') {
+    redirect('/login')
+  }
+
   const params = await searchParams
-  const email = params.email || 'your account'
+  const email = params.email || user.email || 'your account'
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4">

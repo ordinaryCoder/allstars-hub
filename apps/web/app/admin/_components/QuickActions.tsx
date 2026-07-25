@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { addPlayerAdmin, addCoachAdmin } from './actions';
-import { DobInput } from '../(auth)/signup/DobInput';
-import { useSnackbar } from '../../components/ui/shared/Snackbar';
+import { addPlayerAdmin, addCoachAdmin } from '../_actions/action';
+import { DobInput } from '@/app/(auth)/signup/_components/DobInput';
+import { useSnackbar } from '@/components/ui/Snackbar';
 
 export function QuickActions({ locations = [], batches = [] }: { locations?: any[], batches?: any[] }) {
   const [modal, setModal] = useState<'none' | 'player' | 'coach'>('none');
