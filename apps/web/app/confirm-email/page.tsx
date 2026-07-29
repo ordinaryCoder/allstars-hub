@@ -32,7 +32,7 @@ export default async function ConfirmEmailPage() {
 
   return (
     <Suspense fallback={<LoadingFallback />}>
-      <ConfirmEmailContent />
+      <ConfirmEmailContent userEmail={user?.email} />
     </Suspense>
   );
 }

@@ -1,35 +1,53 @@
 import { redirect } from 'next/navigation';
 import { createClient } from './server';
+import { prisma } from '@packages/database';
+import { parseJwtPayload } from '@/lib/auth-utils';
 
 type Role = string | string[];
 
 /**
- * Decodes the payload section of a JWT without a library.
- * Used because custom claims (injected by the Postgres auth hook)
- * are only available in the raw access_token, not on session.user.
+ * Verifies identity server-side via Supabase `getSession()` and validates user roles
+ * from the JWT access token custom claims without making additional DB or API network calls.
  */
-function decodeJwtPayload(token: string): Record<string, unknown> {
-  try {
-    const base64 = token.split('.')[1];
-    return JSON.parse(Buffer.from(base64, 'base64').toString('utf-8'));
-  } catch {
-    throw new Error('Malformed JWT: unable to decode payload');
-  }
-}
+export async function requireRole(userIdOrRole: string | Role, requiredRole?: Role): Promise<void> {
+  let userId: string | undefined;
+  let targetRole: Role;
 
-export async function requireRole(userId: string, requiredRole: Role): Promise<void> {
+  if (requiredRole !== undefined) {
+    userId = userIdOrRole as string;
+    targetRole = requiredRole;
+  } else {
+    targetRole = userIdOrRole as Role;
+  }
+
   const supabase = await createClient();
   const { data: { session } } = await supabase.auth.getSession();
 
-  if (!session || session.user.id !== userId) {
+  if (!session) {
     redirect('/login');
   }
 
-  const payload = decodeJwtPayload(session.access_token);
-  const roles = (payload.roles as string[]) || [];
-  const required = Array.isArray(requiredRole) ? requiredRole : [requiredRole];
+  if (userId && session.user.id !== userId) {
+    redirect('/login');
+  }
 
-  if (!required.some(role => roles.includes(role))) {
+  const payload = parseJwtPayload(session.access_token) || {};
+
+  // Extract roles from custom claims (Postgres auth hook), app_metadata, or user_metadata
+  const rawRoles: unknown[] = [
+    ...(Array.isArray(payload.roles) ? payload.roles : payload.roles ? [payload.roles] : []),
+    ...(Array.isArray(payload.role) ? payload.role : payload.role ? [payload.role] : []),
+    ...(typeof payload.user_metadata === 'object' && payload.user_metadata && payload.user_metadata !== null && 'role' in payload.user_metadata ? [(payload.user_metadata as Record<string, unknown>).role] : []),
+    ...(typeof payload.app_metadata === 'object' && payload.app_metadata && payload.app_metadata !== null && 'role' in payload.app_metadata ? [(payload.app_metadata as Record<string, unknown>).role] : []),
+    ...(typeof payload.app_metadata === 'object' && payload.app_metadata && payload.app_metadata !== null && 'roles' in payload.app_metadata && Array.isArray((payload.app_metadata as Record<string, unknown>).roles) ? (payload.app_metadata as Record<string, unknown>).roles as unknown[] : [])
+  ];
+
+  const userRoles = new Set(rawRoles.filter(Boolean).map(r => String(r).toLowerCase()));
+  const required = (Array.isArray(targetRole) ? targetRole : [targetRole]).map(r => String(r).toLowerCase());
+
+  const hasRole = required.some(req => userRoles.has(req));
+
+  if (!hasRole) {
     redirect('/unauthorized');
   }
 }

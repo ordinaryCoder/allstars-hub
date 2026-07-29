@@ -6,11 +6,11 @@ import { useState, useTransition, useEffect } from "react";
 import { resendConfirmationEmail } from "../_actions/action";
 import { signOut } from "@/app/actions";
 
-export default function ConfirmEmailContent() {
+export default function ConfirmEmailContent({ userEmail }: { userEmail?: string }) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const emailFromParams = searchParams.get("email");
-  const email = emailFromParams ? decodeURIComponent(emailFromParams) : null;
+  const email = userEmail || (emailFromParams ? decodeURIComponent(emailFromParams) : null);
 
   const [isPending, startTransition] = useTransition();
   const [message, setMessage] = useState<string | null>(null);

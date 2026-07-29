@@ -1,7 +1,7 @@
 'use server';
 
 import { createClient } from '@/lib/server';
-import { prisma } from '../../../../../packages/database';
+import { prisma } from '@packages/database';
 import { revalidatePath } from 'next/cache';
 
 export async function updateProfile(formData: FormData) {

@@ -30,24 +30,32 @@ export const prisma = globalForPrisma.prisma ?? new PrismaClient({ adapter });
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 
-// RLS Utility: Call this inside Next.js API routes
-export const getTenantDb = (jwt: string) => {
-  // Decode JWT payload to pass to Postgres
-  const payload = jwt.split('.')[1];
-  const decodedJwt = Buffer.from(payload, 'base64').toString('utf-8');
+// RLS Utility: Pass raw JWT access_token to scope Prisma queries to tenant context
+export const getTenantDb = (jwt?: string) => {
+  if (!jwt) return prisma;
 
-  return prisma.$extends({
-    query: {
-      $allModels: {
-        async $allOperations({ args, query }) {
-          // Wrap every query in a transaction that sets the JWT claim first
-          const [, result] = await prisma.$transaction([
-            prisma.$executeRaw`SELECT set_config('request.jwt.claims', ${decodedJwt}::text, TRUE)`,
-            query(args),
-          ]);
-          return result;
+  try {
+    const parts = jwt.split('.');
+    if (parts.length !== 3) return prisma;
+    const base64Url = parts[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const paddedBase64 = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
+    const decodedJwt = Buffer.from(paddedBase64, 'base64').toString('utf-8');
+
+    return prisma.$extends({
+      query: {
+        $allModels: {
+          async $allOperations({ args, query }) {
+            const [, result] = await prisma.$transaction([
+              prisma.$executeRaw`SELECT set_config('request.jwt.claims', ${decodedJwt}::text, TRUE)`,
+              query(args),
+            ]);
+            return result;
+          },
         },
       },
-    },
-  });
+    });
+  } catch {
+    return prisma;
+  }
 };

@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/server'
-import { prisma } from '../../../../packages/database'
-import { signOut } from '../actions'
+import { prisma } from '@packages/database'
+import { signOut } from '@/app/actions'
 
 export default async function PendingApprovalPage({
   searchParams,
@@ -30,7 +30,7 @@ export default async function PendingApprovalPage({
   }
 
   const params = await searchParams
-  const email = params.email || user.email || 'your account'
+  const email = user.email || params.email || 'your account'
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4">

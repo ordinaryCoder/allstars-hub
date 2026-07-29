@@ -2,7 +2,7 @@
 
 import { createClient } from '@/lib/server';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
-import { prisma } from '../../../../../../packages/database';
+import { prisma } from '@packages/database';
 import {
   validateSignupData,
   normalizeIndianMobile,

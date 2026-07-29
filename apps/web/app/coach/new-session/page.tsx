@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { createClient } from '../../../lib/server';
-import { prisma } from '../../../../../packages/database';
+import { prisma } from '@packages/database';
 import { redirect } from 'next/navigation';
 import AttendanceRoster from './_components/AttendanceRoster';
 import { saveAttendance } from './_actions/action';
@@ -38,13 +38,6 @@ export default async function NewSessionPage() {
 
   return (
     <>
-      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-      <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
-      <style dangerouslySetInnerHTML={{ __html: `
-        .material-symbols-outlined {
-          font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-        }
-      `}} />
       <div className="bg-slate-50 text-slate-900 antialiased min-h-screen font-sans">
         <div className="max-w-[448px] mx-auto min-h-screen bg-slate-50 flex flex-col relative pb-32">
       {/* TopAppBar */}

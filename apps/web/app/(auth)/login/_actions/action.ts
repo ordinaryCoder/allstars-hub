@@ -3,19 +3,8 @@
 import { createClient } from '@/lib/server';
 import { redirect } from 'next/navigation';
 import type { UserRole, RedirectPath, LoginState, JWTPayload } from '@/types/auth';
-
-function parseJWTPayload(token: string): JWTPayload | null {
-  try {
-    const parts = token.split('.');
-    if (parts.length !== 3) return null;
-    const base64Url = parts[1];
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    const jsonPayload = Buffer.from(base64, 'base64').toString('utf-8');
-    return JSON.parse(jsonPayload) as JWTPayload;
-  } catch {
-    return null;
-  }
-}
+import { parseJwtPayload, getRoleRedirectPath } from '@/lib/auth-utils';
+import { prisma } from '@packages/database';
 
 export async function login(
   _prevState: LoginState | undefined,
@@ -36,53 +25,44 @@ export async function login(
       password,
     });
 
-  if (authError?.message === 'Email not confirmed') {
-    redirect(`/confirm-email?email=${encodeURIComponent(email)}`);
-  }
+  if (authData?.session && authData?.user) {
+    if (!authData.user.email_confirmed_at) {
+      await supabase.auth.signOut();
+      redirect(`/confirm-email?email=${encodeURIComponent(authData.user.email ?? email)}`);
+    }
 
-  if (authError || !authData.session) {
-    return { error: 'Invalid username or password' };
-  }
+    // Custom claims injected by the hook are stored in the JWT payload, not the user object
+    const jwt = authData.session.access_token;
+    const payload = parseJwtPayload<JWTPayload>(jwt);
 
-  // Custom claims injected by the hook are stored in the JWT payload, not the user object
-  const jwt = authData.session.access_token;
-  const payload = parseJWTPayload(jwt);
+    const status = payload?.status || 'PENDING';
+    const roles = payload?.roles || [];
 
-  const status = payload?.status;
-  const roles = payload?.roles;
-
-  if (!status || status === 'PENDING') {
-    return redirect(
-      `/pending?email=${encodeURIComponent(authData.user.email ?? '')}`
+    const targetRoute = getRoleRedirectPath(
+      roles,
+      status,
+      authData.user.email ?? ''
     );
+
+    if (status !== 'ACTIVE' && status !== 'PENDING') {
+      await supabase.auth.signOut();
+    }
+
+    return redirect(targetRoute);
   }
 
-  if (status !== 'ACTIVE') {
-    await supabase.auth.signOut();
-    return redirect(
-      `/unauthorized?email=${encodeURIComponent(authData.user.email ?? '')}`
-    );
+  // If login failed, check if the account exists and is pending email confirmation
+  try {
+    const authUsers = await prisma.$queryRaw<{ email_confirmed_at: Date | null }[]>`
+      SELECT email_confirmed_at FROM auth.users WHERE LOWER(email) = LOWER(${email}) LIMIT 1
+    `;
+
+    if (authUsers.length > 0 && authUsers[0].email_confirmed_at === null) {
+      redirect(`/confirm-email?email=${encodeURIComponent(email)}`);
+    }
+  } catch (dbErr) {
+    // Fallback if query fails
   }
 
-  const cleanRoles: UserRole[] = Array.isArray(roles)
-    ? roles.filter(
-        (role): role is UserRole =>
-          typeof role === 'string' &&
-          ['coach', 'admin', 'player', 'parent'].includes(role)
-      )
-    : [];
-
-  let targetRoute: RedirectPath = `/unauthorized?email=${encodeURIComponent(
-    authData.user.email ?? ''
-  )}`;
-  if (cleanRoles.includes('coach')) targetRoute = '/coach';
-  else if (cleanRoles.includes('admin')) targetRoute = '/admin';
-  else if (
-    cleanRoles.includes('player') ||
-    cleanRoles.includes('parent')
-  ) {
-    targetRoute = '/player';
-  }
-
-  return redirect(targetRoute);
+  return { error: 'Invalid username or password' };
 }

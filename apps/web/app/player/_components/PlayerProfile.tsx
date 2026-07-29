@@ -1,6 +1,17 @@
 import { updateProfile } from '../_actions/action';
 
-export function PlayerProfile({ userDetails, playerDetails }: { userDetails: any; playerDetails?: any }) {
+export interface UserDetails {
+  first_name?: string | null;
+  last_name?: string | null;
+  mobile_number?: string | null;
+}
+
+export interface PlayerDetails {
+  first_name?: string | null;
+  last_name?: string | null;
+}
+
+export function PlayerProfile({ userDetails, playerDetails }: { userDetails?: UserDetails | null; playerDetails?: PlayerDetails | null }) {
   return (
     <section className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 space-y-4">
       <div className="flex flex-col gap-1">
@@ -17,7 +28,7 @@ export function PlayerProfile({ userDetails, playerDetails }: { userDetails: any
           <input
             name="firstName"
             type="text"
-            defaultValue={userDetails?.first_name}
+            defaultValue={userDetails?.first_name || ''}
             required
             className="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-slate-900 outline-none"
           />
@@ -27,7 +38,7 @@ export function PlayerProfile({ userDetails, playerDetails }: { userDetails: any
           <input
             name="lastName"
             type="text"
-            defaultValue={userDetails?.last_name}
+            defaultValue={userDetails?.last_name || ''}
             required
             className="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-slate-900 outline-none"
           />

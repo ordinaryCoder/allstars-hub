@@ -1,9 +1,10 @@
 'use server';
 
-import { prisma } from '../../../../../packages/database';
+import { prisma } from '@packages/database';
 import { revalidatePath } from 'next/cache';
 import { signup } from '@/app/(auth)/signup/_actions/action';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+import { requireRole } from '@/lib/dal';
 
 /**
  * Generates a secure temporary password.
@@ -13,7 +14,28 @@ function generateTempPassword() {
   return Math.random().toString(36).slice(-8) + 'X1!';
 }
 
+/**
+ * Approves a pending user (Admin only).
+ */
+export async function approveUser(formData: FormData): Promise<void> {
+  await requireRole('admin');
+
+  const userId = formData.get('userId')?.toString().trim();
+  if (!userId) {
+    return;
+  }
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { status: 'ACTIVE' },
+  });
+
+  revalidatePath('/admin');
+}
+
 export async function addPlayerAdmin(formData: FormData): Promise<{ success: false; error: string } | { success: true }> {
+  await requireRole('admin');
+
   const res = await signup(formData, true);
   if (!res.success) return { success: false, error: res.error };
   revalidatePath('/admin');
@@ -21,14 +43,13 @@ export async function addPlayerAdmin(formData: FormData): Promise<{ success: fal
 }
 
 export async function addCoachAdmin(formData: FormData): Promise<{ success: false; error: string } | { success: true }> {
+  await requireRole('admin');
+
   const email = formData.get('email')?.toString().trim() || '';
   const firstName = formData.get('firstName')?.toString().trim() || '';
   const lastName = formData.get('lastName')?.toString().trim() || '';
   const mobileNumber = formData.get('mobileNumber')?.toString().trim() || '';
   const locationId = formData.get('locationId')?.toString().trim() || '';
-  const batchIdsString = formData.get('batchIds')?.toString().trim() || '';
-
-  const batchIds = batchIdsString ? batchIdsString.split(',') : [];
 
   if (!email || !firstName || !lastName || !mobileNumber || !locationId) {
     return { success: false as const, error: 'Please fill in all required fields' };
@@ -60,9 +81,9 @@ export async function addCoachAdmin(formData: FormData): Promise<{ success: fals
         first_name: firstName,
         last_name: lastName,
         mobile_number: mobileNumber,
-        location_id: locationId
-      }
-    }
+        location_id: locationId,
+      },
+    },
   });
 
   if (authError || !authData?.user) {
@@ -70,8 +91,8 @@ export async function addCoachAdmin(formData: FormData): Promise<{ success: fals
   }
 
   await prisma.coachLocation.create({
-    data: { user_id: authData.user.id, location_id: locationId }
-  })
+    data: { user_id: authData.user.id, location_id: locationId },
+  });
 
   revalidatePath('/admin');
   return { success: true };

@@ -143,3 +143,80 @@ $$;
 GRANT EXECUTE ON FUNCTION public.custom_access_token_hook(jsonb) TO supabase_auth_admin;
 REVOKE ALL ON FUNCTION public.custom_access_token_hook(jsonb) FROM PUBLIC;
 GRANT USAGE ON SCHEMA public TO supabase_auth_admin;
+
+
+-- =======================================================
+--  DELETE USER OR PLAYER PERMANENTLY FUNCTION
+-- =======================================================
+
+-- Function to permanently remove a player or parent along with all associated 
+-- data (attendance, batches, parent_player links, roles, public user, and auth user)
+-- while maintaining strict foreign key dependency order.
+CREATE OR REPLACE FUNCTION public.delete_user_permanently(target_email TEXT)
+RETURNS TEXT
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, auth
+AS $$
+DECLARE
+    v_user_id UUID;
+    v_player_ids UUID[];
+BEGIN
+    -- 1. Locate User ID from auth.users or public.users
+    SELECT id INTO v_user_id FROM auth.users WHERE email = target_email;
+    IF v_user_id IS NULL THEN
+        SELECT id INTO v_user_id FROM public.users WHERE email = target_email;
+    END IF;
+
+    IF v_user_id IS NULL THEN
+        RETURN 'User with email ' || target_email || ' not found.';
+    END IF;
+
+    -- 2. Identify all associated Player IDs (Self-Registered Player OR Parent's Linked Children)
+    SELECT ARRAY_AGG(id) INTO v_player_ids FROM (
+        SELECT id FROM public.players WHERE user_id = v_user_id
+        UNION
+        SELECT player_id FROM public.parent_player WHERE parent_user_id = v_user_id
+    ) t;
+
+    -- 3. Delete Attendance records (for these players OR marked by this user)
+    DELETE FROM public.attendance 
+    WHERE (v_player_ids IS NOT NULL AND player_id = ANY(v_player_ids))
+       OR marked_by = v_user_id;
+
+    -- 4. Delete Player Batch associations
+    IF v_player_ids IS NOT NULL THEN
+        DELETE FROM public.player_batches WHERE player_id = ANY(v_player_ids);
+    END IF;
+
+    -- 5. Delete Parent-Player links
+    DELETE FROM public.parent_player 
+    WHERE parent_user_id = v_user_id 
+       OR (v_player_ids IS NOT NULL AND player_id = ANY(v_player_ids));
+
+    -- 6. Delete Player profiles
+    IF v_player_ids IS NOT NULL THEN
+        DELETE FROM public.players WHERE id = ANY(v_player_ids);
+    END IF;
+    DELETE FROM public.players WHERE user_id = v_user_id;
+
+    -- 7. Clean up Sessions created or coached by the user
+    UPDATE public.sessions SET coach_id = NULL WHERE coach_id = v_user_id;
+    DELETE FROM public.goals WHERE session_id IN (SELECT id FROM public.sessions WHERE created_by = v_user_id);
+    DELETE FROM public.session_batches WHERE session_id IN (SELECT id FROM public.sessions WHERE created_by = v_user_id);
+    DELETE FROM public.sessions WHERE created_by = v_user_id;
+
+    -- 8. Delete Coach Location assignments and User Roles
+    DELETE FROM public.coach_locations WHERE user_id = v_user_id;
+    DELETE FROM public.user_academy_roles WHERE user_id = v_user_id;
+
+    -- 9. Delete from public.users
+    DELETE FROM public.users WHERE id = v_user_id;
+
+    -- 10. Delete from auth.users (Supabase Auth)
+    DELETE FROM auth.users WHERE id = v_user_id;
+
+    RETURN 'Successfully deleted user ' || target_email || ' (ID: ' || v_user_id || ') and all linked records.';
+END;
+$$;
+

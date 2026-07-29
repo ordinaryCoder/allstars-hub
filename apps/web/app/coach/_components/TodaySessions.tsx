@@ -1,4 +1,20 @@
-export function TodaySessions({ sessions }: { sessions: any[] }) {
+export interface SessionBatch {
+  batch: { name: string };
+}
+
+export interface SessionLocation {
+  name: string;
+}
+
+export interface Session {
+  id: string;
+  start_time: Date;
+  end_time: Date;
+  location?: SessionLocation | null;
+  batches: SessionBatch[];
+}
+
+export function TodaySessions({ sessions }: { sessions: Session[] }) {
 
   const now = new Date();
 

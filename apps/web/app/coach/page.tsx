@@ -3,8 +3,9 @@ import { redirect } from 'next/navigation';
 import { requireRole } from '../../lib/dal';
 import { ACADEMY_NAME } from '@/lib/constant';
 import { TodaySessions } from './_components/TodaySessions';
-import { prisma } from '../../../../packages/database';
+import { prisma } from '@packages/database';
 import { PerformanceTrack } from './_components/PerformanceTrack';
+import { signOut } from '@/app/actions';
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -16,13 +17,6 @@ export default async function DashboardPage() {
   }
 
   await requireRole(user.id, 'coach');
-
-  async function signOut() {
-    'use server';
-    const supabase = await createClient();
-    await supabase.auth.signOut();
-    redirect('/login');
-  }
 
   const userName = user.email?.split('@')[0] || 'Coach';
 
@@ -100,13 +94,6 @@ export default async function DashboardPage() {
 
   return (
     <>
-      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-      <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
-      <style dangerouslySetInnerHTML={{ __html: `
-        .material-symbols-outlined {
-          font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-        }
-      `}} />
       <div className="bg-slate-50 text-slate-900 antialiased min-h-screen font-sans">
         <div className="max-w-[448px] mx-auto min-h-screen bg-slate-50 flex flex-col relative pb-24">
           <TopAppBar userName={userName} onSignOut={signOut} />

@@ -1,11 +1,13 @@
 import { createClient } from '@/lib/server'
 import { redirect } from 'next/navigation'
 import { requireRole } from '@/lib/dal'
-import { prisma } from '../../../../packages/database'
-import { UserManagementBoard } from './_components/UserManagementBoard'
+import { prisma } from '@packages/database'
+import { UserManagementBoard, type User } from './_components/UserManagementBoard'
 import { TopAppBar } from '@/components/layout/TopAppBar'
 import { HomeTab } from './_components/HomeTab'
 import { BottomNavBar } from './_components/BottomNavBar'
+import { approveUser } from './_actions/action'
+import { signOut } from '@/app/actions'
 
 // TODO: Check data mapping to schema and modify schema to fit data need in UI
 export default async function AdminPage({
@@ -26,56 +28,27 @@ export default async function AdminPage({
 
   await requireRole(user.id, 'admin')
 
-  let pendingUsers: any[] = []
-  let activeUsers: any[] = []
+  let pendingUsers: User[] = []
+  let activeUsers: User[] = []
 
   if (tab === 'users') {
     pendingUsers = (await prisma.user.findMany({
       where: { status: 'PENDING' },
       include: { academy_roles: true },
       orderBy: { created_at: 'desc' },
+      take: 50,
     }));
     
     activeUsers = (await prisma.user.findMany({
       where: { status: 'ACTIVE' },
       include: { academy_roles: true },
       orderBy: { created_at: 'desc' },
+      take: 100,
     }));
-  }
-
-  async function approveUser(formData: any) {
-    'use server'
-
-    const userId = formData.get('userId')?.toString()
-
-    if (!userId) {
-      redirect('/admin?tab=users')
-    }
-
-    await prisma.user.update({
-      where: { id: userId },
-      data: { status: 'ACTIVE' },
-    })
-
-    redirect('/admin?tab=users')
-  }
-
-  async function signOut() {
-    'use server'
-    const supabase = await createClient()
-    await supabase.auth.signOut()
-    redirect('/login')
   }
 
   return (
     <>
-      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-      <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
-      <style dangerouslySetInnerHTML={{ __html: `
-        .material-symbols-outlined {
-          font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-        }
-      `}} />
       <div className="bg-slate-100 flex justify-center min-h-screen font-sans text-slate-900">
         <div className="w-full max-w-[448px] bg-slate-50 min-h-screen pb-24 relative shadow-2xl shadow-slate-200 flex flex-col overflow-x-hidden">
           <TopAppBar signOut={signOut} />

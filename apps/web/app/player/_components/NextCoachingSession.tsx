@@ -1,4 +1,11 @@
-export function NextCoachingSession({ session }: { session: any }) {
+export interface CoachingSession {
+  start_time: Date | string;
+  location?: { name?: string | null } | null;
+  coach?: { first_name?: string | null; last_name?: string | null } | null;
+  batches?: { batch?: { name?: string | null } | null }[] | null;
+}
+
+export function NextCoachingSession({ session }: { session: CoachingSession | null }) {
   if (!session) return null;
 
   const time = new Date(session.start_time).toLocaleString('en-US', {

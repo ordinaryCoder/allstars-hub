@@ -8,7 +8,7 @@ export type RedirectPath =
   | '/player'
   | '/parent'
   | '/pending'
-  | string;
+  | (string & {});
 
 export interface LoginState {
   error?: string;

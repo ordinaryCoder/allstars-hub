@@ -3,7 +3,20 @@
 import { useState, useMemo, useEffect } from 'react';
 
 // --- Types ---
-type User = any;
+export interface UserRole {
+  permissions?: unknown;
+}
+
+export interface User {
+  id: string;
+  first_name?: string | null;
+  last_name?: string | null;
+  email?: string | null;
+  mobile_number?: string | null;
+  status?: string | null;
+  created_at?: Date | string | null;
+  academy_roles?: UserRole[];
+}
 
 // --- Helpers ---
 const getPermissionsStr = (user: User) => {
@@ -112,12 +125,45 @@ function ActiveUserCard({ user, isAdmin = false }: { user: User; isAdmin?: boole
   );
 }
 
+function SearchInput({
+  value,
+  onChange
+}: {
+  value: string;
+  onChange: (val: string) => void;
+}) {
+  return (
+    <div className="relative w-full">
+      <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[20px]">
+        search
+      </span>
+      <input
+        type="text"
+        placeholder="Search by name, email, or mobile..."
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full h-[44px] pl-10 pr-4 bg-white border border-slate-200 rounded-xl text-[14px] font-medium text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none shadow-sm transition-all"
+      />
+      {value && (
+        <button
+          type="button"
+          onClick={() => onChange('')}
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+        >
+          <span className="material-symbols-outlined text-[18px]">close</span>
+        </button>
+      )}
+    </div>
+  );
+}
+
 export function UserManagementBoard({ pendingUsers, activeUsers, approveUser }: {
-  pendingUsers: any[];
-  activeUsers: any[];
+  pendingUsers: User[];
+  activeUsers: User[];
   approveUser: (formData: FormData) => void;
 }) {
   const [viewMode, setViewMode] = useState<'pending' | 'players' | 'coaches'>('pending');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const activePlayers = useMemo(() => activeUsers.filter(isParentOrPlayer), [activeUsers]);
   const activeCoaches = useMemo(() => activeUsers.filter(u => !isParentOrPlayer(u)), [activeUsers]);
@@ -127,13 +173,25 @@ export function UserManagementBoard({ pendingUsers, activeUsers, approveUser }: 
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [viewMode, pageSize]);
+  }, [viewMode, pageSize, searchQuery]);
 
-  const currentList = viewMode === 'pending' ? pendingUsers : viewMode === 'players' ? activePlayers : activeCoaches;
-  const totalRecords = currentList.length;
+  const baseList = viewMode === 'pending' ? pendingUsers : viewMode === 'players' ? activePlayers : activeCoaches;
+
+  const filteredList = useMemo(() => {
+    if (!searchQuery.trim()) return baseList;
+    const q = searchQuery.toLowerCase().trim();
+    return baseList.filter(user => {
+      const fullName = `${user.first_name || ''} ${user.last_name || ''}`.toLowerCase();
+      const email = (user.email || '').toLowerCase();
+      const mobile = (user.mobile_number || '').toLowerCase();
+      return fullName.includes(q) || email.includes(q) || mobile.includes(q);
+    });
+  }, [baseList, searchQuery]);
+
+  const totalRecords = filteredList.length;
   const totalPages = Math.max(1, Math.ceil(totalRecords / pageSize));
   const startIndex = (currentPage - 1) * pageSize;
-  const paginatedList = currentList.slice(startIndex, startIndex + pageSize);
+  const paginatedList = filteredList.slice(startIndex, startIndex + pageSize);
 
   return (
     <div className="flex flex-col gap-6 w-full relative">
@@ -143,8 +201,11 @@ export function UserManagementBoard({ pendingUsers, activeUsers, approveUser }: 
         <p className="text-[14px] leading-[20px] text-slate-500">Manage access and roles for all academy members.</p>
       </section>
 
-      {/* Filter Dropdown */}
-      <FilterDropdown value={viewMode} onChange={setViewMode} />
+      {/* Controls Section: Search & Filter */}
+      <div className="flex flex-col gap-3">
+        <SearchInput value={searchQuery} onChange={setSearchQuery} />
+        <FilterDropdown value={viewMode} onChange={setViewMode} />
+      </div>
 
       {/* Dynamic User List */}
       <div className="flex flex-col gap-3 min-h-[50vh]">

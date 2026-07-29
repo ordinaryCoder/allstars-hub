@@ -3,7 +3,8 @@ import { BottomNav } from '@/components/layout/BottomNav';
 import { createClient } from '@/lib/server';
 import { redirect } from 'next/navigation';
 import { requireRole } from '@/lib/dal';
-import { prisma } from '../../../../../packages/database';
+import { prisma } from '@packages/database';
+import { signOut } from '@/app/actions';
 
 export default async function PlayerProfilePage() {
   const supabase = await createClient();
@@ -34,17 +35,10 @@ export default async function PlayerProfilePage() {
   const userName = player ? `${player.first_name} ${player.last_name}` : dbUser?.first_name ? `${dbUser.first_name} ${dbUser.last_name}` : 'Player';
   const initials = userName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase();
 
-  async function signOut() {
-    'use server';
-    const supabase = await createClient();
-    await supabase.auth.signOut();
-    redirect('/login');
-  }
+
 
   return (
     <>
-      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-      <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
       <div className="bg-slate-100 flex justify-center min-h-screen font-sans text-slate-900 antialiased">
         <div className="w-full max-w-[448px] bg-slate-50 min-h-screen pb-24 relative shadow-2xl shadow-slate-200 flex flex-col overflow-x-hidden">
           <TopAppBar userName={userName} initials={initials} signOut={signOut} />

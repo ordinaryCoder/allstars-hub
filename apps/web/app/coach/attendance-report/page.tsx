@@ -1,9 +1,11 @@
 import Link from 'next/link';
 import { createClient } from '../../../lib/server';
-import { prisma } from '../../../../../packages/database';
+import { prisma } from '@packages/database';
 import { redirect } from 'next/navigation';
 import { requireRole } from '../../../lib/dal';
 import DateFilterDropdown from './_components/DateFilterDropdown';
+
+export const revalidate = 30;
 
 export default async function AttendanceReportPage({
   searchParams,
@@ -34,6 +36,7 @@ export default async function AttendanceReportPage({
       attendance: { where: { status: 'PRESENT' } },
       batches: { include: { batch: { include: { players: { select: { player_id: true } } } } } },
     },
+    take: 100,
   });
 
   const playerStats = new Map<string, { expected: number; attended: number }>();
@@ -90,6 +93,7 @@ export default async function AttendanceReportPage({
       last_name: true,
       batches: { include: { batch: { select: { name: true } } } },
     },
+    take: 50,
   });
   const playerDetailsMap = new Map(lowAttendancePlayerDetails.map(p => [p.id, p]));
 
@@ -106,14 +110,7 @@ export default async function AttendanceReportPage({
 
   return (
     <>
-      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-      <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
-      <style dangerouslySetInnerHTML={{ __html: `
-        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
-        body { font-family: 'Inter', sans-serif; }
-        .hide-scrollbar::-webkit-scrollbar { display: none; }
-        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-      `}} />
+
 
       <div className="bg-slate-50 text-slate-900 antialiased min-h-screen font-sans">
         <div className="max-w-[448px] mx-auto min-h-screen bg-slate-50 flex flex-col relative pb-8">

@@ -1,6 +1,6 @@
 "use server";
 import { createClient } from '@/lib/server';
-import { prisma } from '../../../../../../packages/database';
+import { prisma } from '@packages/database';
 
 export async function saveAttendance(payload: { attendance: Record<string, string>, playersByLocation?: { locationId: string; players: { id: string }[] }[] }) {
   try {
