@@ -1,8 +1,7 @@
-'use client';
-
 import React from 'react';
 import Link from 'next/link';
 import { AcademyLogo } from '@/components/icons';
+import { Spinner } from '@/components/ui/Loading';
 
 interface AuthLayoutContainerProps {
   title: string;
@@ -21,7 +20,7 @@ export function AuthLayoutContainer({
     <div className="bg-gray-50 text-gray-900 antialiased min-h-screen flex flex-col items-center justify-center p-4 sm:p-8">
       {pending && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/60 backdrop-blur-sm transition-all duration-300">
-          <div className="h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-black" />
+          <Spinner size="lg" color="black" />
         </div>
       )}
 

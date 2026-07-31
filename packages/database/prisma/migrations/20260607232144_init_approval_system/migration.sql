@@ -2,7 +2,7 @@
 CREATE TYPE "ApprovalStatus" AS ENUM ('PENDING', 'ACTIVE', 'INACTIVE');
 
 -- CreateEnum
-CREATE TYPE "AttendanceStatus" AS ENUM ('PRESENT', 'ABSENT', 'LEAVE');
+CREATE TYPE "AttendanceStatus" AS ENUM ('PRESENT', 'ABSENT', 'LATE');
 
 -- CreateTable
 CREATE TABLE "academies" (

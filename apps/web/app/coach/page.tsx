@@ -7,6 +7,8 @@ import { prisma } from '@packages/database';
 import { PerformanceTrack } from './_components/PerformanceTrack';
 import { signOut } from '@/app/actions';
 
+import { CoachBottomNav } from '@/components/layout/CoachBottomNav';
+
 export default async function DashboardPage() {
   const supabase = await createClient();
   const { data: { user }, error } = await supabase.auth.getUser();
@@ -40,57 +42,8 @@ export default async function DashboardPage() {
     orderBy: { start_time: 'asc' },
   });
   
-  const thirtyDaysAgo = new Date(today);
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-  const sevenDaysAgo = new Date(today);
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
-  const pastSessions = await prisma.session.findMany({
-    where: {
-      created_by: user.id,
-      start_time: { gte: thirtyDaysAgo, lt: today },
-    },
-    include: {
-      batches: { include: { batch: { include: { players: true } } } },
-      attendance: true,
-    },
-  });
-
-  let weeklyExpected = 0, weeklyAttended = 0;
-  let monthlyExpected = 0, monthlyAttended = 0;
-  const weeklyPlayers = new Set();
-  const monthlyPlayers = new Set();
-
-  pastSessions.forEach(session => {
-    const isWeekly = session.start_time >= sevenDaysAgo;
-    const uniqueSessionPlayers = new Set();
-    
-    session.batches.forEach(sb => {
-      sb.batch?.players?.forEach(pb => {
-        uniqueSessionPlayers.add(pb.player_id);
-        monthlyPlayers.add(pb.player_id);
-        if (isWeekly) weeklyPlayers.add(pb.player_id);
-      });
-    });
-
-    const expectedForSession = uniqueSessionPlayers.size;
-    const attendedForSession = session.attendance.length;
-
-    monthlyExpected += expectedForSession;
-    monthlyAttended += attendedForSession;
-
-    if (isWeekly) {
-      weeklyExpected += expectedForSession;
-      weeklyAttended += attendedForSession;
-    }
-  });
-
-  const performanceData = {
-    weeklyAvgAttendance: weeklyExpected > 0 ? Math.round((weeklyAttended / weeklyExpected) * 100) : 0,
-    monthlyAvgAttendance: monthlyExpected > 0 ? Math.round((monthlyAttended / monthlyExpected) * 100) : 0,
-    weeklyActivePlayers: weeklyPlayers.size,
-    monthlyActivePlayers: monthlyPlayers.size,
-  };
+  const now = new Date();
+  const futureSessionsCount = todaySessions.filter(s => new Date(s.start_time) > now).length;
 
   return (
     <>
@@ -99,12 +52,11 @@ export default async function DashboardPage() {
           <TopAppBar userName={userName} onSignOut={signOut} />
           
           <main className="flex-1 px-4 py-6 flex flex-col gap-6">
-            <CreateSessionCard sessionCount={todaySessions.length} />
+            <CreateSessionCard futureSessionsCount={futureSessionsCount} />
             <TodaySessions sessions={todaySessions} />
-            <PerformanceTrack data={performanceData} />
           </main>
 
-          <BottomNavBar />
+          <CoachBottomNav currentTab="home" />
         </div>
       </div>
     </>
@@ -137,13 +89,17 @@ function TopAppBar({ userName, onSignOut }: { userName: string, onSignOut: () =>
   );
 }
 
-function CreateSessionCard({ sessionCount }: { sessionCount: number }) {
+function CreateSessionCard({ futureSessionsCount }: { futureSessionsCount: number }) {
   return (
     <section className="grid grid-cols-2 gap-3">
-      <div className="col-span-2 bg-slate-900 rounded-2xl p-5 shadow-md flex flex-col justify-between min-h-[120px] relative overflow-hidden group">
-        <div className="relative z-10">
-          <p className="text-sm text-slate-400">{sessionCount} session{sessionCount !== 1 ? 's' : ''} scheduled for today</p>
-        </div>
+      <div className="col-span-2 bg-slate-900 rounded-2xl p-5 shadow-md flex flex-col justify-between min-h-[100px] relative overflow-hidden group">
+        {futureSessionsCount > 0 && (
+          <div className="relative z-10 mb-3">
+            <p className="text-sm text-slate-400">
+              {futureSessionsCount} session{futureSessionsCount !== 1 ? 's' : ''} scheduled for today
+            </p>
+          </div>
+        )}
         <a href="/coach/new-session" className="relative z-10 w-full bg-white text-slate-900 text-sm font-medium py-3 rounded-xl flex items-center justify-center gap-2 active:scale-95 transition-transform hover:bg-slate-50">
           <span className="material-symbols-outlined text-[20px]">add_circle</span>
           Mark Attendance
@@ -153,24 +109,5 @@ function CreateSessionCard({ sessionCount }: { sessionCount: number }) {
         </div>
       </div>
     </section>
-  );
-}
-
-function BottomNavBar() {
-  return (
-    <nav className="fixed bottom-0 left-0 right-0 max-w-[448px] mx-auto w-full z-50 flex justify-around items-center h-20 px-2 pb-2 bg-white border-t border-slate-200 shadow-[0_-1px_3px_0_rgba(0,0,0,0.05)]" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
-      <a className="flex flex-col items-center justify-center text-slate-900 bg-slate-100 rounded-2xl px-4 py-1 transition-opacity active:opacity-80" href="#">
-        <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>home</span>
-        <span className="text-[11px] font-medium mt-1">Home</span>
-      </a>
-      <a className="flex flex-col items-center justify-center text-slate-500 hover:bg-slate-50 rounded-2xl px-4 py-1 transition-opacity active:opacity-80" href="#">
-        <span className="material-symbols-outlined">group</span>
-        <span className="text-[11px] font-medium mt-1">Players</span>
-      </a>
-      <a className="flex flex-col items-center justify-center text-slate-500 hover:bg-slate-50 rounded-2xl px-4 py-1 transition-opacity active:opacity-80" href="#">
-        <span className="material-symbols-outlined">person</span>
-        <span className="text-[11px] font-medium mt-1">Profile</span>
-      </a>
-    </nav>
   );
 }
