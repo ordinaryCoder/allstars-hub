@@ -106,7 +106,7 @@ export default async function AttendanceReportPage() {
     totalLocationPlayers: totalLocationPlayersCount,
   };
 
-  // 3. Fetch all recorded sessions for the coach
+  // 3. Fetch all recorded sessions for the coach (no batch query for Phase 1)
   const sessions = await prisma.session.findMany({
     where: {
       OR: [
@@ -119,11 +119,6 @@ export default async function AttendanceReportPage() {
       attendance: {
         include: {
           player: true,
-        },
-      },
-      batches: {
-        include: {
-          batch: true,
         },
       },
     },
@@ -148,7 +143,7 @@ export default async function AttendanceReportPage() {
     ).length;
     const sessionTotal = session.attendance.length;
     const sessionRate = sessionTotal > 0 ? Math.round((sessionPresent / sessionTotal) * 100) : 0;
-    const batchNames = session.batches.map((b) => b.batch.name).join(', ') || 'General Batch';
+    const sessionTitle = session.location?.name ? `${session.location.name} Session` : 'General Session';
 
     return {
       id: session.id,
@@ -158,25 +153,24 @@ export default async function AttendanceReportPage() {
       sessionPresent,
       sessionTotal,
       sessionRate,
-      batchNames,
     };
   });
 
   // 4. Calculate low attendance players (< 80%)
   const playerStatsMap = new Map<
     string,
-    { name: string; batch: string; expected: number; attended: number }
+    { name: string; locationName: string; expected: number; attended: number }
   >();
 
   sessions.forEach((session) => {
     session.attendance.forEach((att) => {
       const playerId = att.player_id;
       const playerName = att.player ? `${att.player.first_name} ${att.player.last_name}` : 'Player';
-      const batchName = session.batches[0]?.batch?.name || 'N/A';
+      const locationName = session.location?.name || 'Assigned Location';
 
       const existing = playerStatsMap.get(playerId) || {
         name: playerName,
-        batch: batchName,
+        locationName,
         expected: 0,
         attended: 0,
       };
@@ -194,7 +188,7 @@ export default async function AttendanceReportPage() {
       return {
         id,
         name: data.name,
-        batch: data.batch,
+        locationName: data.locationName,
         attendancePercentage: percentage,
         absences: data.expected - data.attended,
       };

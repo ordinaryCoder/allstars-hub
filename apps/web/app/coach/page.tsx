@@ -37,7 +37,6 @@ export default async function DashboardPage() {
     },
     include: {
       location: true,
-      batches: { include: { batch: true } },
     },
     orderBy: { start_time: 'asc' },
   });

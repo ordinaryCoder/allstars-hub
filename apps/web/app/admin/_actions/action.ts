@@ -4,6 +4,7 @@ import { prisma } from '@packages/database';
 import { revalidatePath } from 'next/cache';
 import { signup } from '@/app/(auth)/signup/_actions/action';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+import { createClient } from '@/lib/server';
 import { requireRole } from '@/lib/dal';
 
 /**
@@ -31,6 +32,69 @@ export async function approveUser(formData: FormData): Promise<void> {
   });
 
   revalidatePath('/admin');
+}
+
+/**
+ * Single authoritative query function for fetching users by category ('players' | 'coaches' | 'pending').
+ */
+export async function getUsersByCategory(category: 'players' | 'coaches' | 'pending') {
+  const supabase = await createClient();
+  const { data: { user }, error } = await supabase.auth.getUser();
+
+  if (error || !user) {
+    throw new Error('Unauthorized');
+  }
+
+  await requireRole('admin');
+
+  if (category === 'pending') {
+    return await prisma.user.findMany({
+      where: { status: 'PENDING' },
+      select: {
+        id: true,
+        first_name: true,
+        last_name: true,
+        email: true,
+        mobile_number: true,
+        status: true,
+        created_at: true,
+        academy_roles: { select: { permissions: true } },
+      },
+      orderBy: { created_at: 'desc' },
+    });
+  }
+
+  const activeUsers = await prisma.user.findMany({
+    where: { status: 'ACTIVE' },
+    select: {
+      id: true,
+      first_name: true,
+      last_name: true,
+      email: true,
+      mobile_number: true,
+      status: true,
+      created_at: true,
+      academy_roles: { select: { permissions: true } },
+    },
+    orderBy: { created_at: 'desc' },
+  });
+
+  if (category === 'players') {
+    return activeUsers.filter((u) => {
+      const perms = u.academy_roles?.[0]?.permissions;
+      if (!perms) return false;
+      const permStr = Array.isArray(perms) ? perms.join(',').toLowerCase() : String(perms).toLowerCase();
+      return permStr.includes('parent') || permStr.includes('player');
+    });
+  }
+
+  // Coaches / Admins
+  return activeUsers.filter((u) => {
+    const perms = u.academy_roles?.[0]?.permissions;
+    if (!perms) return false;
+    const permStr = Array.isArray(perms) ? perms.join(',').toLowerCase() : String(perms).toLowerCase();
+    return !permStr.includes('parent') && !permStr.includes('player');
+  });
 }
 
 export async function addPlayerAdmin(formData: FormData): Promise<{ success: false; error: string } | { success: true }> {

@@ -2,7 +2,25 @@
 
 import { useState, useMemo, useEffect, useRef } from 'react';
 
-export function WeeklyAttendanceChart({ locations, weeklyAttendances, totalPlayers }: any) {
+export interface LocationItem {
+  id: string;
+  name: string;
+}
+
+export interface WeeklyAttendanceRecord {
+  marked_at: Date | string;
+  session?: {
+    location_id?: string;
+  } | null;
+}
+
+export interface WeeklyAttendanceChartProps {
+  locations: LocationItem[];
+  weeklyAttendances: WeeklyAttendanceRecord[];
+  totalPlayers: number;
+}
+
+export function WeeklyAttendanceChart({ locations = [], weeklyAttendances = [], totalPlayers = 0 }: WeeklyAttendanceChartProps) {
   const [selectedLocationId, setSelectedLocationId] = useState('all');
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -23,9 +41,9 @@ export function WeeklyAttendanceChart({ locations, weeklyAttendances, totalPlaye
     
     const filtered = selectedLocationId === 'all'
       ? weeklyAttendances
-      : weeklyAttendances.filter((a: any) => a.session?.location_id === selectedLocationId);
+      : weeklyAttendances.filter((a) => a.session?.location_id === selectedLocationId);
 
-    filtered.forEach((a: any) => {
+    filtered.forEach((a) => {
       if (!a.marked_at) return;
       const date = new Date(a.marked_at);
       let day = date.getDay() - 1; // 0 = Mon, 6 = Sun
@@ -42,7 +60,7 @@ export function WeeklyAttendanceChart({ locations, weeklyAttendances, totalPlaye
   const days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
   const selectedLocationName = selectedLocationId === 'all'
     ? 'All Locations'
-    : locations.find((l: any) => l.id === selectedLocationId)?.name || 'Unknown Location';
+    : locations.find((l) => l.id === selectedLocationId)?.name || 'Unknown Location';
 
   return (
     <section className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 relative">
@@ -55,6 +73,7 @@ export function WeeklyAttendanceChart({ locations, weeklyAttendances, totalPlaye
         <div className="relative" ref={dropdownRef}>
           <button
             type="button"
+            aria-label="Select location filter"
             onClick={() => setDropdownOpen(!dropdownOpen)}
             className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-50 active:scale-95 transition-all text-slate-400 hover:text-slate-600"
           >
@@ -64,13 +83,15 @@ export function WeeklyAttendanceChart({ locations, weeklyAttendances, totalPlaye
           {dropdownOpen && (
             <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-slate-100 py-1 z-50 animate-in fade-in zoom-in duration-200">
               <button
+                type="button"
                 onClick={() => { setSelectedLocationId('all'); setDropdownOpen(false); }}
                 className={`w-full text-left px-4 py-2.5 text-sm hover:bg-slate-50 transition-colors ${selectedLocationId === 'all' ? 'font-bold text-slate-900 bg-slate-50' : 'text-slate-600'}`}
               >
                 All Locations
               </button>
-              {locations.map((loc: any) => (
+              {locations.map((loc) => (
                 <button
+                  type="button"
                   key={loc.id}
                   onClick={() => { setSelectedLocationId(loc.id); setDropdownOpen(false); }}
                   className={`w-full text-left px-4 py-2.5 text-sm hover:bg-slate-50 transition-colors truncate ${selectedLocationId === loc.id ? 'font-bold text-slate-900 bg-slate-50' : 'text-slate-600'}`}

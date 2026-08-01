@@ -13,11 +13,6 @@ export interface SerializedPlayer {
   isActive: boolean;
   locationId: string;
   locationName: string;
-  batches: Array<{
-    id: string;
-    name: string;
-    sportName?: string | null;
-  }>;
   parents: Array<{
     id: string;
     name: string;
@@ -55,13 +50,11 @@ export function PlayerListBoard({ players, locations }: PlayerListBoardProps) {
         const query = searchTerm.toLowerCase().trim();
         const fullName = `${player.firstName} ${player.lastName}`.toLowerCase();
         const locationName = player.locationName.toLowerCase();
-        const batchNames = player.batches.map((b) => b.name.toLowerCase()).join(' ');
         const parentNames = player.parents.map((p) => p.name.toLowerCase()).join(' ');
 
         return (
           fullName.includes(query) ||
           locationName.includes(query) ||
-          batchNames.includes(query) ||
           parentNames.includes(query)
         );
       }
@@ -91,7 +84,7 @@ export function PlayerListBoard({ players, locations }: PlayerListBoardProps) {
           </span>
           <input
             type="text"
-            placeholder="Search player by name, location, or batch..."
+            placeholder="Search player by name or location..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition-all"
@@ -212,22 +205,6 @@ export function PlayerListBoard({ players, locations }: PlayerListBoardProps) {
                     {player.isActive ? 'Active' : 'Inactive'}
                   </span>
                 </div>
-
-                {/* Batches & Sports */}
-                {player.batches.length > 0 && (
-                  <div className="flex items-center gap-1.5 flex-wrap pt-1 border-t border-slate-100">
-                    <span className="text-[11px] font-semibold text-slate-400 mr-1">Batches:</span>
-                    {player.batches.map((b) => (
-                      <span
-                        key={b.id}
-                        className="text-[11px] font-medium text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-md"
-                      >
-                        {b.sportName ? `${b.sportName} - ` : ''}
-                        {b.name}
-                      </span>
-                    ))}
-                  </div>
-                )}
               </div>
             );
           })

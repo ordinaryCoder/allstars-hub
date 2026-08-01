@@ -12,13 +12,12 @@ export interface RecordedSessionItem {
   sessionPresent: number;
   sessionTotal: number;
   sessionRate: number;
-  batchNames: string;
 }
 
 export interface LowAttendancePlayerItem {
   id: string;
   name: string;
-  batch: string;
+  locationName: string;
   attendancePercentage: number;
   absences: number;
 }
@@ -105,7 +104,7 @@ export function AttendanceReportView({
 
                 <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
                   <span className="text-slate-600 font-medium">
-                    {session.batchNames}
+                    📍 {session.locationName}
                   </span>
                   <span className="font-semibold text-slate-900 bg-slate-100 px-2 py-0.5 rounded-md">
                     {session.sessionPresent} / {session.sessionTotal} Present
@@ -156,7 +155,7 @@ export function AttendanceReportView({
                   </div>
                   <div>
                     <h4 className="font-semibold text-slate-900 text-sm leading-tight">{player.name}</h4>
-                    <p className="text-xs text-slate-500 mt-0.5">{player.batch}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">📍 {player.locationName}</p>
                   </div>
                 </div>
                 <div className="text-right">

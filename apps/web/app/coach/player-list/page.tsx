@@ -27,7 +27,7 @@ export default async function CoachPlayersListPage() {
     address: cl.location.address,
   }));
 
-  // Fetch all players for the locations the coach has access to
+  // Fetch all players for the locations the coach has access to (no batch query for Phase 1)
   const rawPlayers = await prisma.player.findMany({
     where: {
       location: {
@@ -36,13 +36,6 @@ export default async function CoachPlayersListPage() {
     },
     include: {
       location: true,
-      batches: {
-        include: {
-          batch: {
-            include: { sport: true },
-          },
-        },
-      },
       parents: {
         include: { parent: true },
       },
@@ -74,11 +67,6 @@ export default async function CoachPlayersListPage() {
       isActive: p.is_active,
       locationId: p.location_id,
       locationName: p.location?.name || 'Unknown Location',
-      batches: p.batches.map((pb) => ({
-        id: pb.batch.id,
-        name: pb.batch.name,
-        sportName: pb.batch.sport?.name ?? null,
-      })),
       parents: p.parents.map((pp) => ({
         id: pp.parent.id,
         name: `${pp.parent.first_name} ${pp.parent.last_name}`.trim(),

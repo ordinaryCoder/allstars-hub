@@ -4,13 +4,22 @@ import { useState, useTransition } from 'react';
 import { addPlayerAdmin, addCoachAdmin } from '../_actions/action';
 import { DobInput } from '@/app/(auth)/signup/_components/DobInput';
 import { useSnackbar } from '@/components/ui/Snackbar';
+import { Spinner } from '@/components/ui/Loading';
 
-export function QuickActions({ locations = [], batches = [] }: { locations?: any[], batches?: any[] }) {
+export interface QuickActionsLocation {
+  id: string;
+  name: string;
+}
+
+export interface QuickActionsProps {
+  locations?: QuickActionsLocation[];
+}
+
+export function QuickActions({ locations = [] }: QuickActionsProps) {
   const [modal, setModal] = useState<'none' | 'player' | 'coach'>('none');
   const [role, setRole] = useState('parent');
   const [dob, setDob] = useState('');
   const [selectedLocation, setSelectedLocation] = useState('');
-  const [selectedBatches, setSelectedBatches] = useState<string[]>([]);
   const [isPending, startTransition] = useTransition();
   const { showSnackbar } = useSnackbar();
 
@@ -34,7 +43,6 @@ export function QuickActions({ locations = [], batches = [] }: { locations?: any
   const handleCoachSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    formData.append('batchIds', selectedBatches.join(','));
     startTransition(async () => {
       const res = await addCoachAdmin(formData);
       if (!res.success) {
@@ -42,13 +50,10 @@ export function QuickActions({ locations = [], batches = [] }: { locations?: any
       } else {
         setModal('none');
         setSelectedLocation('');
-        setSelectedBatches([]);
         showSnackbar({ message: 'Coach added successfully', type: 'success' });
       }
     });
   };
-
-  const filteredBatches = batches.filter(b => b.location_id === selectedLocation);
 
   return (
     <section className="space-y-3">
@@ -102,14 +107,14 @@ export function QuickActions({ locations = [], batches = [] }: { locations?: any
                 {role === 'parent' && (
                   <div className="flex flex-col gap-1">
                     <label className="text-sm font-medium text-slate-900">Guardian / Parent Name</label>
-                    <input name="guardianName" type="text" required placeholder="Guardian full name" className="w-full h-12 px-4 bg-white border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-slate-900 outline-none" />
+                    <input autoFocus name="guardianName" type="text" required placeholder="Guardian full name" className="w-full h-12 px-4 bg-white border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-slate-900 outline-none" />
                   </div>
                 )}
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="flex flex-col gap-1">
                     <label className="text-sm font-medium text-slate-900">{role === 'parent' ? 'Player First Name' : 'First Name'}</label>
-                    <input name="firstName" type="text" required placeholder="First name" className="w-full h-12 px-4 bg-white border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-slate-900 outline-none" />
+                    <input autoFocus={role !== 'parent'} name="firstName" type="text" required placeholder="First name" className="w-full h-12 px-4 bg-white border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-slate-900 outline-none" />
                   </div>
                   <div className="flex flex-col gap-1">
                     <label className="text-sm font-medium text-slate-900">{role === 'parent' ? 'Player Last Name' : 'Last Name'}</label>
@@ -117,15 +122,15 @@ export function QuickActions({ locations = [], batches = [] }: { locations?: any
                   </div>
                 </div>
 
-              <div className="flex flex-col gap-1">
-                <label className="text-sm font-medium text-slate-900">Location</label>
-                <select name="locationId" required defaultValue="" className="w-full h-12 px-4 bg-white border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-slate-900 outline-none">
-                  <option value="" disabled>Select a location</option>
-                  {locations.map(loc => (
-                    <option key={loc.id} value={loc.id}>{loc.name}</option>
-                  ))}
-                </select>
-              </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm font-medium text-slate-900">Location</label>
+                  <select name="locationId" required defaultValue="" className="w-full h-12 px-4 bg-white border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-slate-900 outline-none">
+                    <option value="" disabled>Select a location</option>
+                    {locations.map(loc => (
+                      <option key={loc.id} value={loc.id}>{loc.name}</option>
+                    ))}
+                  </select>
+                </div>
 
                 <div className="flex flex-col gap-1">
                   <label className="text-sm font-medium text-slate-900">Email Address</label>
@@ -150,8 +155,15 @@ export function QuickActions({ locations = [], batches = [] }: { locations?: any
                   A temporary password will be securely generated and assigned to this user automatically.
                 </p>
 
-                <button type="submit" disabled={isPending} className="mt-2 w-full h-14 bg-slate-900 text-white rounded-xl font-semibold hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center disabled:opacity-50">
-                  {isPending ? 'Creating...' : 'Create Player'}
+                <button type="submit" disabled={isPending} className="mt-2 w-full h-14 bg-slate-900 text-white rounded-xl font-semibold hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50">
+                  {isPending ? (
+                    <>
+                      <Spinner size="sm" color="white" />
+                      <span>Creating...</span>
+                    </>
+                  ) : (
+                    <span>Create Player</span>
+                  )}
                 </button>
               </form>
             )}
@@ -162,7 +174,7 @@ export function QuickActions({ locations = [], batches = [] }: { locations?: any
                 <div className="grid grid-cols-2 gap-4">
                   <div className="flex flex-col gap-1">
                     <label className="text-sm font-medium text-slate-900">First Name</label>
-                    <input name="firstName" type="text" required placeholder="First name" className="w-full h-12 px-4 bg-white border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-slate-900 outline-none" />
+                    <input autoFocus name="firstName" type="text" required placeholder="First name" className="w-full h-12 px-4 bg-white border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-slate-900 outline-none" />
                   </div>
                   <div className="flex flex-col gap-1">
                     <label className="text-sm font-medium text-slate-900">Last Name</label>
@@ -176,7 +188,7 @@ export function QuickActions({ locations = [], batches = [] }: { locations?: any
                 </div>
 
                 <div className="flex flex-col gap-1">
-                  <label className="tepxt-sm font-medium text-slate-900">Mobile Number</label>
+                  <label className="text-sm font-medium text-slate-900">Mobile Number</label>
                   <input name="mobileNumber" type="tel" required placeholder="+1 (555) 000-0000" className="w-full h-12 px-4 bg-white border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-slate-900 outline-none" />
                 </div>
 
@@ -184,9 +196,9 @@ export function QuickActions({ locations = [], batches = [] }: { locations?: any
                   <label className="text-sm font-medium text-slate-900">Location</label>
                   <select 
                     required
-                  name="locationId"
+                    name="locationId"
                     value={selectedLocation} 
-                    onChange={(e) => { setSelectedLocation(e.target.value); setSelectedBatches([]); }}
+                    onChange={(e) => setSelectedLocation(e.target.value)}
                     className="w-full h-12 px-4 bg-white border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-slate-900 outline-none"
                   >
                     <option value="" disabled>Select a location</option>
@@ -196,38 +208,19 @@ export function QuickActions({ locations = [], batches = [] }: { locations?: any
                   </select>
                 </div>
 
-                {selectedLocation && (
-                  <div className="flex flex-col gap-2">
-                    <label className="text-sm font-medium text-slate-900">Assign Batches</label>
-                    {filteredBatches.length > 0 ? (
-                      <div className="flex flex-wrap gap-2">
-                        {filteredBatches.map(batch => (
-                          <label key={batch.id} className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg cursor-pointer hover:bg-slate-100 transition-colors">
-                            <input 
-                              type="checkbox" 
-                              checked={selectedBatches.includes(batch.id)}
-                              onChange={(e) => {
-                                if (e.target.checked) setSelectedBatches([...selectedBatches, batch.id]);
-                                else setSelectedBatches(selectedBatches.filter(id => id !== batch.id));
-                              }}
-                              className="rounded border-slate-300 text-slate-900 focus:ring-slate-900" 
-                            />
-                            <span className="text-sm font-medium text-slate-700">{batch.name}</span>
-                          </label>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-xs text-slate-500">No batches available at this location.</p>
-                    )}
-                  </div>
-                )}
-
                 <p className="text-[12px] text-slate-500 mt-2">
                   A temporary password will be securely generated and assigned to this user automatically.
                 </p>
 
-                <button type="submit" disabled={isPending} className="mt-2 w-full h-14 bg-slate-900 text-white rounded-xl font-semibold hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center disabled:opacity-50">
-                  {isPending ? 'Creating...' : 'Create Coach'}
+                <button type="submit" disabled={isPending} className="mt-2 w-full h-14 bg-slate-900 text-white rounded-xl font-semibold hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50">
+                  {isPending ? (
+                    <>
+                      <Spinner size="sm" color="white" />
+                      <span>Creating...</span>
+                    </>
+                  ) : (
+                    <span>Create Coach</span>
+                  )}
                 </button>
               </form>
             )}

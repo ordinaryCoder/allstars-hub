@@ -1,13 +1,13 @@
 import React from 'react';
 
 /**
- * Reusable animated Skeleton shimmer element
+ * Reusable animated Skeleton shimmer element with optimized gradient animation
  */
 export function Skeleton({ className = '', style }: { className?: string; style?: React.CSSProperties }) {
   return (
     <div
       style={style}
-      className={`animate-pulse bg-slate-200/80 rounded-xl ${className}`}
+      className={`animate-pulse bg-gradient-to-r from-slate-200 via-slate-100 to-slate-200 rounded-xl ${className}`}
     />
   );
 }
@@ -49,12 +49,52 @@ export function Spinner({
 }
 
 /**
+ * Modular List Skeleton for internal container loading states
+ */
+export function ListSkeleton({ count = 4 }: { count?: number }) {
+  return (
+    <div className="space-y-3 w-full">
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
+          <div className="flex items-center gap-3 w-full">
+            <Skeleton className="w-11 h-11 rounded-full flex-shrink-0" />
+            <div className="space-y-2 flex-1">
+              <Skeleton className="h-4 w-36 rounded" />
+              <Skeleton className="h-3 w-48 rounded" />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Modular Card Skeleton for KPI or summary card loading states
+ */
+export function CardSkeleton({ count = 1 }: { count?: number }) {
+  return (
+    <div className="space-y-3 w-full">
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm space-y-3">
+          <div className="flex items-center justify-between">
+            <Skeleton className="h-4 w-28 rounded" />
+            <Skeleton className="h-4 w-12 rounded" />
+          </div>
+          <Skeleton className="h-10 w-full rounded-xl" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
  * Central Full Page / App Loader overlay
  */
 export function FullPageLoader({ message }: { message?: string }) {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
-      <div className="bg-white p-6 rounded-3xl shadow-sm border border-black/10 flex flex-col items-center gap-4 max-w-xs w-full text-center">
+      <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 flex flex-col items-center gap-4 max-w-xs w-full text-center animate-in fade-in zoom-in-95 duration-200">
         <Spinner size="lg" color="black" />
         <div className="space-y-1">
           <p className="font-bold text-slate-900 text-base">{message || 'Loading...'}</p>
@@ -97,32 +137,8 @@ export function PageSkeleton({
         )}
 
         <main className="flex-1 px-4 py-6 space-y-4">
-          {/* Card Skeletons */}
-          {Array.from({ length: cardCount }).map((_, i) => (
-            <div key={`card-${i}`} className="bg-white p-4 rounded-2xl border border-black/10 shadow-sm space-y-3">
-              <div className="flex items-center justify-between">
-                <Skeleton className="h-4 w-28 rounded" />
-                <Skeleton className="h-4 w-12 rounded" />
-              </div>
-              <Skeleton className="h-10 w-full rounded-xl" />
-            </div>
-          ))}
-
-          {/* List Skeletons */}
-          <div className="space-y-3">
-            {Array.from({ length: listCount }).map((_, i) => (
-              <div key={`list-${i}`} className="bg-white p-4 rounded-2xl border border-black/10 shadow-sm flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Skeleton className="w-12 h-12 rounded-full" />
-                  <div className="space-y-2">
-                    <Skeleton className="h-4 w-32 rounded" />
-                    <Skeleton className="h-3 w-20 rounded" />
-                  </div>
-                </div>
-                <Skeleton className="h-8 w-24 rounded-xl" />
-              </div>
-            ))}
-          </div>
+          <CardSkeleton count={cardCount} />
+          <ListSkeleton count={listCount} />
         </main>
       </div>
     </div>

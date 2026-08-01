@@ -1,7 +1,3 @@
-export interface SessionBatch {
-  batch: { name: string };
-}
-
 export interface SessionLocation {
   name: string;
 }
@@ -11,11 +7,9 @@ export interface Session {
   start_time: Date;
   end_time: Date;
   location?: SessionLocation | null;
-  batches: SessionBatch[];
 }
 
 export function TodaySessions({ sessions }: { sessions: Session[] }) {
-
   const now = new Date();
 
   return (
@@ -34,7 +28,6 @@ export function TodaySessions({ sessions }: { sessions: Session[] }) {
             const isActive = now >= session.start_time && now <= session.end_time;
             const statusLabel = isActive ? 'ACTIVE' : isCompleted ? 'COMPLETED' : 'UPCOMING';
             const locationTitle = session.location?.name || 'Unassigned Location';
-            const batchNames = session.batches.map((b: { batch: { name: string } }) => b.batch.name).join(', ');
 
             const timeString = new Intl.DateTimeFormat('en-US', {
               hour: 'numeric',
@@ -52,12 +45,6 @@ export function TodaySessions({ sessions }: { sessions: Session[] }) {
                         <span className="material-symbols-outlined text-[16px]">schedule</span>
                         <span className="text-sm font-normal">{timeString}</span>
                       </div>
-                      {batchNames && (
-                        <div className={`flex items-center gap-1 ${isCompleted ? 'text-slate-400' : 'text-slate-500'}`}>
-                          <span className="material-symbols-outlined text-[16px]">groups</span>
-                          <span className="text-sm font-normal">{batchNames}</span>
-                        </div>
-                      )}
                     </div>
                   </div>
                   <span className={`px-3 py-1 text-[11px] font-bold rounded-full border ${isActive ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : isCompleted ? 'bg-slate-100 text-slate-500 border-slate-200' : 'bg-blue-50 text-blue-600 border-blue-100'}`}>

@@ -2,6 +2,12 @@ import { prisma } from '@packages/database';
 import { QuickActions } from './QuickActions';
 import { WeeklyAttendanceChart } from './WeeklyAttendanceChart';
 
+interface NextCoachingSessionItem {
+  id: string;
+  start_time: Date;
+  location?: { name: string } | null;
+}
+
 function getAttendanceMetric(percentage: number) {
   if (percentage >= 90) return { label: 'Optimal', icon: 'check_circle', color: 'text-emerald-500' };
   if (percentage >= 75) return { label: 'Satisfactory', icon: 'thumb_up', color: 'text-blue-500' };
@@ -28,17 +34,25 @@ function UpcomingSessionCard({ title, time, locationName }: { title: string, tim
 }
 
 export async function HomeTab() {
-  const activeUsers = await prisma.user.findMany({
-    where: { status: 'ACTIVE' },
-    include: { academy_roles: true },
+  // Direct SQL COUNT query on active players table
+  let totalPlayers = await prisma.player.count({
+    where: { is_active: true },
   });
 
-  const totalPlayers = activeUsers.filter((user: any) => {
-    const perms = user.academy_roles?.[0]?.permissions;
-    if (!perms) return false;
-    const permStr = Array.isArray(perms) ? perms.join(',').toLowerCase() : String(perms).toLowerCase();
-    return permStr.includes('parent') || permStr.includes('player');
-  }).length;
+  if (totalPlayers === 0) {
+    // Fallback: Lightweight select for active user roles
+    const activeUsers = await prisma.user.findMany({
+      where: { status: 'ACTIVE' },
+      select: { academy_roles: { select: { permissions: true } } },
+    });
+
+    totalPlayers = activeUsers.filter((user) => {
+      const perms = user.academy_roles?.[0]?.permissions;
+      if (!perms) return false;
+      const permStr = Array.isArray(perms) ? perms.join(',').toLowerCase() : String(perms).toLowerCase();
+      return permStr.includes('parent') || permStr.includes('player');
+    }).length;
+  }
 
   // Calculate attendance trend
   const now = new Date();
@@ -59,7 +73,7 @@ export async function HomeTab() {
   if (lastMonthAttendance > 0) {
     trendPercent = ((thisMonthAttendance - lastMonthAttendance) / lastMonthAttendance) * 100;
   } else if (thisMonthAttendance > 0) {
-    trendPercent = 100; // 100% increase if last month was 0 but this month is > 0
+    trendPercent = 100;
   }
 
   const isUp = trendPercent > 0;
@@ -72,10 +86,6 @@ export async function HomeTab() {
   const locations = await prisma.location.findMany({
     select: { id: true, name: true }
   });
-  
-  const batches = await prisma.batch.findMany({
-    select: { id: true, name: true, location_id: true }
-  });
 
   // Get boundaries for the current week (Monday - Sunday)
   const dayOfWeek = now.getDay() || 7;
@@ -86,7 +96,7 @@ export async function HomeTab() {
   endOfWeek.setDate(startOfWeek.getDate() + 6);
   endOfWeek.setHours(23, 59, 59, 999);
 
-  let weeklyAttendances: any[] = [];
+  let weeklyAttendances: { marked_at: Date; session: { location_id: string } }[] = [];
   try {
     weeklyAttendances = await prisma.attendance.findMany({
       where: { marked_at: { gte: startOfWeek, lte: endOfWeek } },
@@ -99,7 +109,7 @@ export async function HomeTab() {
     console.error("Weekly attendance fetch failed", e);
   }
 
-  // Calculate today's attendance
+  // Today's attendance metrics (location & SQL aggregate based)
   const startOfToday = new Date(now);
   startOfToday.setHours(0, 0, 0, 0);
   const endOfToday = new Date(now);
@@ -111,19 +121,21 @@ export async function HomeTab() {
   try {
     const todaysSessions = await prisma.session.findMany({
       where: { start_time: { gte: startOfToday, lte: endOfToday } },
-      include: {
-        batches: { include: { batch: { include: { players: true } } } },
-        attendance: true
+      select: {
+        location_id: true,
+        _count: { select: { attendance: true } }
       }
     });
 
-    todaysSessions.forEach(session => {
-      const uniquePlayers = new Set();
-      session.batches.forEach(sb => {
-        sb.batch?.players?.forEach(pb => uniquePlayers.add(pb.player_id));
+    const sessionLocationIds = Array.from(new Set(todaysSessions.map(s => s.location_id).filter(Boolean)));
+    if (sessionLocationIds.length > 0) {
+      expectedPlayersCount = await prisma.player.count({
+        where: { location_id: { in: sessionLocationIds }, is_active: true }
       });
-      expectedPlayersCount += uniquePlayers.size;
-      attendedPlayersCount += session.attendance.length;
+    }
+
+    todaysSessions.forEach(session => {
+      attendedPlayersCount += session._count.attendance;
     });
   } catch (e) {
     console.error("Today's attendance fetch failed", e);
@@ -134,7 +146,7 @@ export async function HomeTab() {
     : 0;
   const todaysMetric = getAttendanceMetric(todaysAttendancePercent);
 
-  // Calculate active players in live sessions
+  // Active players in live sessions (location based)
   let activeSessionsPlayersCount = 0;
   try {
     const activeSessions = await prisma.session.findMany({
@@ -142,32 +154,33 @@ export async function HomeTab() {
         start_time: { lte: now },
         end_time: { gte: now }
       },
-      include: {
-        batches: { include: { batch: { include: { players: true } } } }
+      select: {
+        location_id: true,
+        _count: { select: { attendance: true } }
       }
     });
 
-    const activeUniquePlayers = new Set();
-    activeSessions.forEach(session => {
-      session.batches.forEach(sb => {
-        sb.batch?.players?.forEach(pb => activeUniquePlayers.add(pb.player_id));
+    const activeLocationIds = Array.from(new Set(activeSessions.map(s => s.location_id).filter(Boolean)));
+    if (activeLocationIds.length > 0) {
+      activeSessionsPlayersCount = await prisma.player.count({
+        where: { location_id: { in: activeLocationIds }, is_active: true }
       });
-    });
-    activeSessionsPlayersCount = activeUniquePlayers.size;
+    }
   } catch (e) {
     console.error("Active sessions fetch failed", e);
   }
 
-  // Fetch upcoming sessions grouped by the exact same hour
-  let nextCoachingSessions: any[] = [];
+  // Upcoming sessions
+  let nextCoachingSessions: NextCoachingSessionItem[] = [];
   try {
     const futureSessions = await prisma.session.findMany({
       where: { start_time: { gt: now } },
       orderBy: { start_time: 'asc' },
       take: 10,
-      include: {
-        location: true,
-        batches: { include: { batch: true } }
+      select: {
+        id: true,
+        start_time: true,
+        location: { select: { name: true } }
       }
     });
 
@@ -221,13 +234,13 @@ export async function HomeTab() {
       />
 
       {/* Quick Actions Integration */}
-      <QuickActions locations={locations} batches={batches} />
+      <QuickActions locations={locations} />
 
       {/* Recent Activity / Featured Card */}
       <div className="flex flex-col gap-3">
         {nextCoachingSessions.length > 0 ? (
           nextCoachingSessions.map((session) => {
-            const title = session.batches?.map((b: any) => b.batch?.name).join(', ') || 'Training Session';
+            const title = session.location?.name ? `${session.location.name} Session` : 'Training Session';
             const time = session.start_time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             const locationName = session.location?.name || 'Unknown Location';
             return (
