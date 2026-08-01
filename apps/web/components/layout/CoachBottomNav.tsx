@@ -1,8 +1,8 @@
 import Link from 'next/link';
 
-export function CoachBottomNav({ currentTab = 'home' }: { currentTab?: 'home' | 'addplayers' | 'players' | 'report' | 'reports' | 'attendance-report' | 'profile' }) {
+export function CoachBottomNav({ currentTab = 'home' }: { currentTab?: 'home' | 'player-list' | 'report' | 'reports' | 'attendance-report' | 'profile' }) {
   const isHome = currentTab === 'home';
-  const isPlayers = currentTab === 'addplayers' || currentTab === 'players';
+  const isPlayers = currentTab === 'player-list';
   const isReports = currentTab === 'report' || currentTab === 'reports' || currentTab === 'attendance-report';
   const isProfile = currentTab === 'profile';
 
@@ -24,7 +24,7 @@ export function CoachBottomNav({ currentTab = 'home' }: { currentTab?: 'home' | 
       </Link>
 
       <Link 
-        href="/coach/addplayers" 
+        href="/coach/player-list" 
         className={`flex flex-col items-center justify-center rounded-2xl px-3 py-1.5 transition-all active:scale-95 ${
           isPlayers ? 'text-slate-900 bg-slate-100 font-semibold' : 'text-slate-500 hover:bg-slate-50'
         }`}

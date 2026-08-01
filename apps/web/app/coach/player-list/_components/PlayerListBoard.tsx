@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Tooltip } from '@/components/ui/Tooltip';
+import { Pagination } from '@/components/ui/Pagination';
 
 export interface SerializedPlayer {
   id: string;
@@ -39,6 +40,8 @@ interface PlayerListBoardProps {
 export function PlayerListBoard({ players, locations }: PlayerListBoardProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedLocationId, setSelectedLocationId] = useState<string>('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
 
   const filteredPlayers = useMemo(() => {
     return players.filter((player) => {
@@ -67,13 +70,23 @@ export function PlayerListBoard({ players, locations }: PlayerListBoardProps) {
     });
   }, [players, selectedLocationId, searchTerm]);
 
+  // Reset to first page when search query, location filter, or page size changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedLocationId, pageSize]);
+
+  const totalRecords = filteredPlayers.length;
+  const totalPages = Math.max(1, Math.ceil(totalRecords / pageSize));
+  const startIndex = (currentPage - 1) * pageSize;
+  const paginatedPlayers = filteredPlayers.slice(startIndex, startIndex + pageSize);
+
   return (
     <div className="flex flex-col gap-4">
       {/* Search & Location Filter Section */}
       <div className="flex flex-col gap-3">
         {/* Search Bar */}
         <div className="relative w-full">
-          <span className="material-symbols-outlined absolute left-3 top.5 top-1/2 -translate-y-1/2 text-slate-400 text-[20px]">
+          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[20px]">
             search
           </span>
           <input
@@ -131,7 +144,7 @@ export function PlayerListBoard({ players, locations }: PlayerListBoardProps) {
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between px-1">
           <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-            Players ({filteredPlayers.length})
+            Players ({totalRecords})
           </span>
           {locations.length === 1 && (
             <span className="text-xs font-medium text-slate-600 bg-slate-200/60 px-2 py-0.5 rounded-md">
@@ -140,7 +153,7 @@ export function PlayerListBoard({ players, locations }: PlayerListBoardProps) {
           )}
         </div>
 
-        {filteredPlayers.length === 0 ? (
+        {totalRecords === 0 ? (
           <div className="bg-white rounded-2xl p-8 border border-slate-200 text-center flex flex-col items-center justify-center gap-2">
             <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
               <span className="material-symbols-outlined text-[28px]">group_off</span>
@@ -153,7 +166,7 @@ export function PlayerListBoard({ players, locations }: PlayerListBoardProps) {
             </p>
           </div>
         ) : (
-          filteredPlayers.map((player) => {
+          paginatedPlayers.map((player) => {
             const initials = `${player.firstName[0] || ''}${player.lastName[0] || ''}`.toUpperCase();
             const isParentRegistered = player.parents && player.parents.length > 0;
 
@@ -219,6 +232,18 @@ export function PlayerListBoard({ players, locations }: PlayerListBoardProps) {
             );
           })
         )}
+
+        {/* Shared Pagination Controls */}
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={totalRecords}
+          pageSize={pageSize}
+          pageSizeOptions={[5, 10, 20]}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={setPageSize}
+          showPageSizeSelector={true}
+        />
       </div>
     </div>
   );

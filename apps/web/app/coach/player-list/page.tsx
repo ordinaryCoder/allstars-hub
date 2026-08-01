@@ -5,7 +5,7 @@ import { prisma } from '@packages/database';
 import { CoachBottomNav } from '@/components/layout/CoachBottomNav';
 import { PlayerListBoard, SerializedPlayer, SerializedLocation } from './_components/PlayerListBoard';
 
-export default async function CoachAddPlayersPage() {
+export default async function CoachPlayersListPage() {
   const supabase = await createClient();
   const { data: { user }, error } = await supabase.auth.getUser();
 
@@ -111,7 +111,7 @@ export default async function CoachAddPlayersPage() {
           <PlayerListBoard players={players} locations={locations} />
         </main>
 
-        <CoachBottomNav currentTab="addplayers" />
+        <CoachBottomNav currentTab="player-list" />
       </div>
     </div>
   );

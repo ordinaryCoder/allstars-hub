@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { PerformanceTrack, PerformanceData } from '../../_components/PerformanceTrack';
+import { Pagination } from '@/components/ui/Pagination';
 
 export interface RecordedSessionItem {
   id: string;
@@ -36,67 +37,14 @@ function getInitials(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-interface PaginationProps {
-  currentPage: number;
-  totalPages: number;
-  totalItems: number;
-  pageSize: number;
-  onPageChange: (page: number) => void;
-}
-
-function PaginationControls({
-  currentPage,
-  totalPages,
-  totalItems,
-  pageSize,
-  onPageChange,
-}: PaginationProps) {
-  const startIndex = (currentPage - 1) * pageSize;
-  const endIndex = Math.min(startIndex + pageSize, totalItems);
-
-  return (
-    <div className="flex items-center justify-between gap-4 mt-1 pt-3 border-t border-slate-200">
-      <span className="text-xs font-medium text-slate-500">
-        {startIndex + 1}-{endIndex} of {totalItems}
-      </span>
-
-      <div className="flex items-center gap-1">
-        <button
-          type="button"
-          aria-label="Previous Page"
-          onClick={() => onPageChange(Math.max(1, currentPage - 1))}
-          disabled={currentPage === 1}
-          className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed text-slate-900 shadow-sm transition-all active:scale-95"
-        >
-          <span className="material-symbols-outlined text-[18px]">chevron_left</span>
-        </button>
-
-        <span className="text-xs font-semibold text-slate-700 px-2">
-          {currentPage} / {totalPages}
-        </span>
-
-        <button
-          type="button"
-          aria-label="Next Page"
-          onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
-          disabled={currentPage === totalPages}
-          className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed text-slate-900 shadow-sm transition-all active:scale-95"
-        >
-          <span className="material-symbols-outlined text-[18px]">chevron_right</span>
-        </button>
-      </div>
-    </div>
-  );
-}
-
 export function AttendanceReportView({
   performanceData,
   recordedSessions,
   lowAttendancePlayers,
 }: AttendanceReportViewProps) {
-  // Pagination state for Recorded Sessions (5 items per page)
+  // Pagination state for Recorded Sessions (configurable 5, 10, 20 items per page)
   const [sessionsPage, setSessionsPage] = useState(1);
-  const sessionsPageSize = 5;
+  const [sessionsPageSize, setSessionsPageSize] = useState(5);
   const sessionsTotal = recordedSessions.length;
   const sessionsTotalPages = Math.max(1, Math.ceil(sessionsTotal / sessionsPageSize));
   const sessionsStartIndex = (sessionsPage - 1) * sessionsPageSize;
@@ -105,9 +53,9 @@ export function AttendanceReportView({
     sessionsStartIndex + sessionsPageSize
   );
 
-  // Pagination state for Low Attendance Flags (5 items per page)
+  // Pagination state for Low Attendance Flags (configurable 5, 10, 20 items per page)
   const [flagsPage, setFlagsPage] = useState(1);
-  const flagsPageSize = 5;
+  const [flagsPageSize, setFlagsPageSize] = useState(5);
   const flagsTotal = lowAttendancePlayers.length;
   const flagsTotalPages = Math.max(1, Math.ceil(flagsTotal / flagsPageSize));
   const flagsStartIndex = (flagsPage - 1) * flagsPageSize;
@@ -166,16 +114,17 @@ export function AttendanceReportView({
               </div>
             ))}
 
-            {/* Pagination Controls for Recorded Sessions */}
-            {sessionsTotal > sessionsPageSize && (
-              <PaginationControls
-                currentPage={sessionsPage}
-                totalPages={sessionsTotalPages}
-                totalItems={sessionsTotal}
-                pageSize={sessionsPageSize}
-                onPageChange={setSessionsPage}
-              />
-            )}
+            {/* Shared Pagination Controls for Recorded Sessions */}
+            <Pagination
+              currentPage={sessionsPage}
+              totalPages={sessionsTotalPages}
+              totalItems={sessionsTotal}
+              pageSize={sessionsPageSize}
+              pageSizeOptions={[5, 10, 20]}
+              onPageChange={setSessionsPage}
+              onPageSizeChange={setSessionsPageSize}
+              showPageSizeSelector={true}
+            />
           </div>
         )}
       </section>
@@ -217,16 +166,17 @@ export function AttendanceReportView({
               </div>
             ))}
 
-            {/* Pagination Controls for Low Attendance Flags */}
-            {flagsTotal > flagsPageSize && (
-              <PaginationControls
-                currentPage={flagsPage}
-                totalPages={flagsTotalPages}
-                totalItems={flagsTotal}
-                pageSize={flagsPageSize}
-                onPageChange={setFlagsPage}
-              />
-            )}
+            {/* Shared Pagination Controls for Low Attendance Flags */}
+            <Pagination
+              currentPage={flagsPage}
+              totalPages={flagsTotalPages}
+              totalItems={flagsTotal}
+              pageSize={flagsPageSize}
+              pageSizeOptions={[5, 10, 20]}
+              onPageChange={setFlagsPage}
+              onPageSizeChange={setFlagsPageSize}
+              showPageSizeSelector={true}
+            />
           </div>
         )}
       </section>
