@@ -65,8 +65,9 @@ export function WeeklyAttendanceChart({
 
   const chartData = useMemo(() => {
     // Determine active player count denominator based on location selection
-    const targetTotalPlayers = selectedLocationId === 'all'
-      ? totalPlayers
+    const sumLocationPlayers = Object.values(locationPlayerCounts).reduce((a, b) => a + b, 0);
+    let targetTotalPlayers = selectedLocationId === 'all'
+      ? (totalPlayers > 0 ? totalPlayers : sumLocationPlayers)
       : (locationPlayerCounts[selectedLocationId] || 0);
 
     // Filter attendances for selected location
@@ -87,12 +88,26 @@ export function WeeklyAttendanceChart({
       }
     });
 
+    // If denominator is 0 for an individual location, fallback to max unique attendees on any day
+    if (targetTotalPlayers === 0) {
+      const maxAttendingInDay = Math.max(...dayPlayerSets.map((s) => s.size), 0);
+      targetTotalPlayers = maxAttendingInDay > 0 ? maxAttendingInDay : 1;
+    }
+
     return dayPlayerSets.map((set) => {
       const count = set.size; // unique active students attending on this day
       const percent = targetTotalPlayers > 0 ? Math.round((count / targetTotalPlayers) * 100) : 0;
       return { count, percent: Math.min(percent, 100) };
     });
   }, [weeklyAttendances, selectedLocationId, totalPlayers, locationPlayerCounts]);
+
+  // Dynamic performance color calculation based on attendance percentage
+  const getBarColor = (percent: number) => {
+    if (percent === 0) return 'bg-slate-200';
+    if (percent >= 75) return 'bg-emerald-500';
+    if (percent >= 50) return 'bg-amber-500';
+    return 'bg-rose-500';
+  };
 
   const days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
   const selectedLocationName = selectedLocationId === 'all'
@@ -103,7 +118,7 @@ export function WeeklyAttendanceChart({
     <section className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 relative">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h2 className="text-lg font-bold text-slate-900">Weekly Attendance Trend</h2>
+          <h2 className="text-lg font-bold text-slate-900">This Week's Attendance Trend</h2>
           <div className="flex items-center gap-1.5 mt-0.5">
             <span className={`w-2 h-2 rounded-full ${activeTheme.dot}`}></span>
             <p className="text-xs font-medium text-slate-500">{selectedLocationName}</p>
@@ -156,17 +171,25 @@ export function WeeklyAttendanceChart({
         </div>
         {/* Bars Container */}
         <div className="relative z-20 flex items-end justify-between h-full pt-4 group/chart">
-          {chartData.map((data, idx) => (
-            <div key={idx} className="flex flex-col items-center gap-2 w-full group relative cursor-crosshair">
-              <div className="w-3 bg-slate-100 rounded-full h-32 relative overflow-hidden">
-                <div className={`absolute bottom-0 left-0 w-full rounded-full transition-all duration-500 ${activeTheme.barColor}`} style={{ height: `${data.percent}%` }}></div>
+          {chartData.map((data, idx) => {
+            const barBg = getBarColor(data.percent);
+            const barHeight = data.count > 0 ? Math.max(data.percent, 10) : 0;
+
+            return (
+              <div key={idx} className="flex flex-col items-center gap-2 w-full group relative cursor-crosshair">
+                <div className="w-3.5 bg-slate-100 rounded-full h-32 relative overflow-hidden">
+                  <div
+                    className={`absolute bottom-0 left-0 w-full rounded-full transition-all duration-500 ${barBg}`}
+                    style={{ height: `${barHeight}%` }}
+                  />
+                </div>
+                <span className="text-[10px] font-bold text-slate-400">{days[idx]}</span>
+                <div className="absolute opacity-0 group-hover:opacity-100 transition-opacity bottom-full mb-1 bg-slate-800 text-white text-[10px] px-2 py-1 rounded shadow-lg pointer-events-none whitespace-nowrap z-50">
+                  {data.percent}% ({data.count} {data.count === 1 ? 'player' : 'players'})
+                </div>
               </div>
-              <span className="text-[10px] font-bold text-slate-400">{days[idx]}</span>
-              <div className="absolute opacity-0 group-hover:opacity-100 transition-opacity bottom-full mb-1 bg-slate-800 text-white text-[10px] px-2 py-1 rounded shadow-lg pointer-events-none whitespace-nowrap z-50">
-                {data.percent}% ({data.count})
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </section>

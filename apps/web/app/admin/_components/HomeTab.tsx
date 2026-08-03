@@ -1,57 +1,41 @@
 import { prisma } from '@packages/database';
+import Link from 'next/link';
 import { QuickActions } from './QuickActions';
 import { WeeklyAttendanceChart } from './WeeklyAttendanceChart';
-
-interface NextCoachingSessionItem {
-  id: string;
-  start_time: Date;
-  location?: { name: string } | null;
-}
-
-function getAttendanceMetric(percentage: number) {
-  if (percentage >= 90) return { label: 'Optimal', icon: 'check_circle', color: 'text-emerald-500' };
-  if (percentage >= 75) return { label: 'Satisfactory', icon: 'thumb_up', color: 'text-blue-500' };
-  if (percentage >= 50) return { label: 'Needs Improvement', icon: 'warning', color: 'text-amber-500' };
-  return { label: 'Critical', icon: 'error', color: 'text-rose-500' };
-}
-
-function UpcomingSessionCard({ title, time, locationName }: { title: string, time: string, locationName: string }) {
-  return (
-    <section className="bg-slate-900 rounded-2xl p-5 shadow-md relative overflow-hidden min-h-[160px] flex flex-col justify-end">
-      <div className="absolute top-0 right-0 w-32 h-32 opacity-10">
-        <span className="material-symbols-outlined !text-[120px] text-white">sports_handball</span>
-      </div>
-      <div className="relative z-10">
-        <p className="text-xs text-slate-400 font-medium">Coming Up Next</p>
-        <h3 className="text-lg font-bold text-white mb-2">{title}</h3>
-        <div className="flex items-center gap-2">
-          <span className="material-symbols-outlined text-[16px] text-slate-400">schedule</span>
-          <span className="text-xs font-medium text-slate-300">{time} - {locationName}</span>
-        </div>
-      </div>
-    </section>
-  );
-}
+import { PastSessionCard } from './PastSessionCard';
+import { UpcomingSessionCard } from './UpcomingSessionCard';
+import { KpiCardsGrid } from './KpiCardsGrid';
 
 export async function HomeTab() {
-  // Direct SQL COUNT query on active players table
-  let totalPlayers = await prisma.player.count({
-    where: { is_active: true },
-  });
-
-  if (totalPlayers === 0) {
-    // Fallback: Lightweight select for active user roles
-    const activeUsers = await prisma.user.findMany({
-      where: { status: 'ACTIVE' },
-      select: { academy_roles: { select: { permissions: true } } },
+  // Total Players KPI: Count of all active registered players in the academy
+  let totalPlayers = 0;
+  try {
+    totalPlayers = await prisma.player.count({
+      where: { is_active: true },
     });
+  } catch (e) {
+    console.error("Player count query failed", e);
+  }
 
-    totalPlayers = activeUsers.filter((user) => {
-      const perms = user.academy_roles?.[0]?.permissions;
-      if (!perms) return false;
-      const permStr = Array.isArray(perms) ? perms.join(',').toLowerCase() : String(perms).toLowerCase();
-      return permStr.includes('parent') || permStr.includes('player');
-    }).length;
+  // Fallback to active parent/player users if player table count is 0
+  if (totalPlayers === 0) {
+    try {
+      const allActiveUsers = await prisma.user.findMany({
+        where: { status: 'ACTIVE' },
+        select: {
+          academy_roles: { select: { permissions: true } },
+        },
+      });
+
+      totalPlayers = allActiveUsers.filter((user) => {
+        const perms = user.academy_roles?.[0]?.permissions;
+        if (!perms) return false;
+        const permStr = Array.isArray(perms) ? perms.join(',').toLowerCase() : String(perms).toLowerCase();
+        return permStr.includes('parent') || permStr.includes('player');
+      }).length;
+    } catch (e) {
+      console.error("User fallback count failed", e);
+    }
   }
 
   // Calculate attendance trend
@@ -140,56 +124,59 @@ export async function HomeTab() {
     console.error("Weekly attendance fetch failed", e);
   }
 
-  // Today's attendance metrics (location & SQL aggregate based)
-  const startOfToday = new Date(now);
-  startOfToday.setHours(0, 0, 0, 0);
-  const endOfToday = new Date(now);
-  endOfToday.setHours(23, 59, 59, 999);
-
-  let expectedPlayersCount = 0;
-  let attendedPlayersCount = 0;
-
+  // Monthly attendance metrics (average attendance rate for sessions conducted this month)
+  let monthlyAttendancePercent = 0;
   try {
-    const todaysSessions = await prisma.session.findMany({
-      where: { start_time: { gte: startOfToday, lte: endOfToday } },
+    const monthlySessions = await prisma.session.findMany({
+      where: {
+        start_time: { gte: startOfThisMonth, lte: now },
+      },
       select: {
         id: true,
         location_id: true,
-      }
+        attendance: {
+          select: { status: true },
+        },
+      },
     });
 
-    const todaysSessionIds = todaysSessions.map(s => s.id);
-    if (todaysSessionIds.length > 0) {
-      const totalMarkedToday = await prisma.attendance.count({
-        where: { session_id: { in: todaysSessionIds } }
-      });
+    if (monthlySessions.length > 0) {
+      let totalPercentSum = 0;
+      let evaluatedSessions = 0;
 
-      attendedPlayersCount = await prisma.attendance.count({
-        where: {
-          session_id: { in: todaysSessionIds },
-          status: { in: ['PRESENT', 'LATE'] }
+      for (const sess of monthlySessions) {
+        if (sess.attendance.length > 0) {
+          const attended = sess.attendance.filter(
+            (a) => a.status === 'PRESENT' || a.status === 'LATE'
+          ).length;
+          let locationPlayers = 0;
+          if (sess.location_id) {
+            locationPlayers = locationPlayerCounts[sess.location_id] || 0;
+          }
+          const denominator = Math.max(locationPlayers, sess.attendance.length);
+          if (denominator > 0) {
+            totalPercentSum += Math.round((attended / denominator) * 100);
+            evaluatedSessions++;
+          }
         }
-      });
+      }
 
-      if (totalMarkedToday > 0) {
-        expectedPlayersCount = totalMarkedToday;
-      } else {
-        const sessionLocationIds = Array.from(new Set(todaysSessions.map(s => s.location_id).filter(Boolean)));
-        if (sessionLocationIds.length > 0) {
-          expectedPlayersCount = await prisma.player.count({
-            where: { location_id: { in: sessionLocationIds }, is_active: true }
-          });
-        }
+      if (evaluatedSessions > 0) {
+        monthlyAttendancePercent = Math.round(totalPercentSum / evaluatedSessions);
       }
     }
   } catch (e) {
-    console.error("Today's attendance fetch failed", e);
+    console.error("Monthly attendance fetch failed", e);
   }
 
-  const todaysAttendancePercent = expectedPlayersCount > 0
-    ? Math.round((attendedPlayersCount / expectedPlayersCount) * 100)
-    : 0;
-  const todaysMetric = getAttendanceMetric(todaysAttendancePercent);
+  function getAttendanceMetric(percentage: number) {
+    if (percentage >= 90) return { label: 'Optimal', icon: 'check_circle', color: 'text-emerald-500' };
+    if (percentage >= 75) return { label: 'Satisfactory', icon: 'thumb_up', color: 'text-blue-500' };
+    if (percentage >= 50) return { label: 'Needs Improvement', icon: 'warning', color: 'text-amber-500' };
+    return { label: 'Critical', icon: 'error', color: 'text-rose-500' };
+  }
+
+  const monthlyMetric = getAttendanceMetric(monthlyAttendancePercent);
 
   // Active players KPI (count of active players who have attended 1+ sessions)
   let activePlayersCount = 0;
@@ -208,51 +195,187 @@ export async function HomeTab() {
     console.error("Active players fetch failed", e);
   }
 
-  // Upcoming sessions (fetches any future sessions planned for any location chronologically)
-  let nextCoachingSessions: { id: string; start_time: Date; location: { name: string } | null }[] = [];
+  // Upcoming session (fetches strictly the first future scheduled session for HomeTab)
+  let nextCoachingSessionsData: {
+    id: string;
+    locationName: string;
+    coachName: string;
+    scheduledAtText: string;
+    totalPlayers: number;
+    sessionDateText: string;
+  }[] = [];
+  let hasMoreUpcomingSessions = false;
+
   try {
-    nextCoachingSessions = await prisma.session.findMany({
+    const futureCount = await prisma.session.count({
+      where: { start_time: { gt: now } },
+    });
+    hasMoreUpcomingSessions = futureCount >= 2;
+
+    const firstFutureSession = await prisma.session.findFirst({
       where: { start_time: { gt: now } },
       orderBy: { start_time: 'asc' },
-      take: 5,
       select: {
         id: true,
         start_time: true,
-        location: { select: { name: true } }
-      }
+        location: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        coach: {
+          select: {
+            first_name: true,
+            last_name: true,
+          },
+        },
+      },
     });
+
+    if (firstFutureSession) {
+      let locationTotalPlayers = 0;
+      if (firstFutureSession.location?.id) {
+        locationTotalPlayers = await prisma.player.count({
+          where: {
+            location_id: firstFutureSession.location.id,
+            is_active: true,
+          },
+        });
+      }
+
+      const scheduledAtText = firstFutureSession.start_time.toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+
+      const sessionDateText = firstFutureSession.start_time.toLocaleDateString([], {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+      });
+
+      const coachName = firstFutureSession.coach
+        ? `${firstFutureSession.coach.first_name} ${firstFutureSession.coach.last_name}`.trim()
+        : 'Unassigned';
+
+      nextCoachingSessionsData.push({
+        id: firstFutureSession.id,
+        locationName: firstFutureSession.location?.name || 'Unknown Location',
+        coachName,
+        scheduledAtText,
+        totalPlayers: locationTotalPlayers,
+        sessionDateText,
+      });
+    }
   } catch (e) {
-    console.error("Upcoming sessions fetch failed", e);
+    console.error("Upcoming session fetch failed", e);
+  }
+
+  // Fetch latest past session conducted (strictly 1 record for HomeTab)
+  let latestPastSessionData: {
+    locationName: string;
+    coachName: string;
+    markedAtText: string;
+    attendedCount: number;
+    totalPlayers: number;
+    sessionDateText: string;
+  } | null = null;
+  let hasMorePastSessions = false;
+
+  try {
+    const pastCount = await prisma.session.count({
+      where: { start_time: { lte: now } },
+    });
+    hasMorePastSessions = pastCount >= 2;
+
+    const pastSession = await prisma.session.findFirst({
+      where: { start_time: { lte: now } },
+      orderBy: { start_time: 'desc' },
+      select: {
+        id: true,
+        start_time: true,
+        location: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        coach: {
+          select: {
+            first_name: true,
+            last_name: true,
+          },
+        },
+        attendance: {
+          select: {
+            id: true,
+            status: true,
+            marked_at: true,
+          },
+        },
+      },
+    });
+
+    if (pastSession) {
+      let locationTotalPlayers = 0;
+      if (pastSession.location?.id) {
+        locationTotalPlayers = await prisma.player.count({
+          where: {
+            location_id: pastSession.location.id,
+            is_active: true,
+          },
+        });
+      }
+
+      const attendedCount = pastSession.attendance.filter(
+        (a) => a.status === 'PRESENT' || a.status === 'LATE'
+      ).length;
+
+      let latestMarkedAt: Date | null = null;
+      pastSession.attendance.forEach((a) => {
+        if (!latestMarkedAt || a.marked_at > latestMarkedAt) {
+          latestMarkedAt = a.marked_at;
+        }
+      });
+
+      const markedAtText = latestMarkedAt
+        ? (latestMarkedAt as Date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        : 'Attendance Pending';
+
+      const sessionDateText = pastSession.start_time.toLocaleDateString([], {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+      });
+
+      const coachName = pastSession.coach
+        ? `${pastSession.coach.first_name} ${pastSession.coach.last_name}`.trim()
+        : 'Unassigned';
+
+      latestPastSessionData = {
+        locationName: pastSession.location?.name || 'Unknown Location',
+        coachName,
+        markedAtText,
+        attendedCount,
+        totalPlayers: Math.max(locationTotalPlayers, pastSession.attendance.length),
+        sessionDateText,
+      };
+    }
+  } catch (e) {
+    console.error("Latest past session fetch failed", e);
   }
 
   return (
     <>
       {/* KPI Cards Grid */}
-      <section className="grid grid-cols-3 gap-3">
-        <div className="bg-white rounded-2xl p-3 shadow-sm border border-slate-100 flex flex-col items-center text-center">
-          <span className="text-xs font-semibold text-slate-500 mb-1">Total Players</span>
-          <span className="text-3xl font-bold text-slate-900">{totalPlayers}</span>
-          <div className={`flex items-center justify-center gap-1 mt-1 ${trendColor}`}>
-            <span className="material-symbols-outlined text-[12px]">{trendIcon}</span>
-            <span className="text-[10px] font-bold">{trendSign}{trendPercent.toFixed(1)}%</span>
-          </div>
-        </div>
-        <div className="bg-white rounded-2xl p-3 shadow-sm border border-slate-100 flex flex-col items-center text-center">
-          <span className="text-xs font-semibold text-slate-500 mb-1">Today's Att.</span>
-          <span className="text-3xl font-bold text-slate-900">{todaysAttendancePercent}%</span>
-          <div className={`flex items-center justify-center gap-1 mt-1 ${todaysMetric.color}`}>
-            <span className="material-symbols-outlined text-[12px]">{todaysMetric.icon}</span>
-            <span className="text-[10px] font-bold">{todaysMetric.label}</span>
-          </div>
-        </div>
-        <div className="bg-white rounded-2xl p-3 shadow-sm border border-slate-100 flex flex-col items-center text-center">
-          <span className="text-xs font-semibold text-slate-500 mb-1">Active</span>
-          <span className="text-3xl font-bold text-slate-900">{activePlayersCount}</span>
-          <div className="flex items-center justify-center gap-1 text-amber-500 mt-1">
-            <span className="material-symbols-outlined text-[12px]">bolt</span>
-          </div>
-        </div>
-      </section>
+      <KpiCardsGrid
+        totalPlayers={totalPlayers}
+        trendPercent={trendPercent}
+        monthlyAttendancePercent={monthlyAttendancePercent}
+        monthlyMetric={monthlyMetric}
+        activePlayersCount={activePlayersCount}
+      />
 
       <WeeklyAttendanceChart
         locations={locations}
@@ -264,26 +387,60 @@ export async function HomeTab() {
       {/* Quick Actions Integration */}
       <QuickActions locations={locations} />
 
-      {/* Recent Activity / Featured Card */}
-      <div className="flex flex-col gap-3">
-        {nextCoachingSessions.length > 0 ? (
-          nextCoachingSessions.map((session) => {
-            const title = session.location?.name ? `${session.location.name} Session` : 'Training Session';
-            const formattedDate = session.start_time.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
-            const formattedTime = session.start_time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            const timeDisplay = `${formattedDate} • ${formattedTime}`;
-            const locationName = session.location?.name || 'Unknown Location';
-            return (
-              <UpcomingSessionCard key={session.id} title={title} time={timeDisplay} locationName={locationName} />
-            );
-          })
+      {/* Past Session Section */}
+      <section className="space-y-3">
+        <div className="flex justify-between items-center px-1">
+          <h2 className="text-lg font-bold text-slate-900">Past Session</h2>
+          {hasMorePastSessions && (
+            <Link href="/admin/sessions/past" className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors">
+              View All
+            </Link>
+          )}
+        </div>
+        {latestPastSessionData ? (
+          <PastSessionCard
+            locationName={latestPastSessionData.locationName}
+            coachName={latestPastSessionData.coachName}
+            markedAtText={latestPastSessionData.markedAtText}
+            attendedCount={latestPastSessionData.attendedCount}
+            totalPlayers={latestPastSessionData.totalPlayers}
+            sessionDateText={latestPastSessionData.sessionDateText}
+          />
         ) : (
-          <section className="bg-slate-900 rounded-2xl p-5 shadow-md relative overflow-hidden min-h-[160px] flex flex-col justify-center items-center text-center">
-            <span className="material-symbols-outlined text-[48px] text-slate-700 mb-2">event_available</span>
-            <h3 className="text-sm font-bold text-slate-400">No upcoming sessions</h3>
+          <div className="bg-white rounded-2xl p-5 border border-slate-100 text-center text-slate-500 text-xs font-medium">
+            No past sessions conducted yet.
+          </div>
+        )}
+      </section>
+
+      {/* Upcoming Sessions Section */}
+      <section className="space-y-3">
+        <div className="flex justify-between items-center px-1">
+          <h2 className="text-lg font-bold text-slate-900">Upcoming Sessions</h2>
+          {hasMoreUpcomingSessions && (
+            <Link href="/admin/sessions/upcoming" className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors">
+              View All
+            </Link>
+          )}
+        </div>
+        {nextCoachingSessionsData.length > 0 ? (
+          nextCoachingSessionsData.map((session) => (
+            <UpcomingSessionCard
+              key={session.id}
+              locationName={session.locationName}
+              coachName={session.coachName}
+              scheduledAtText={session.scheduledAtText}
+              totalPlayers={session.totalPlayers}
+              sessionDateText={session.sessionDateText}
+            />
+          ))
+        ) : (
+          <section className="bg-slate-900 rounded-2xl p-5 shadow-md relative overflow-hidden min-h-[140px] flex flex-col justify-center items-center text-center">
+            <span className="material-symbols-outlined text-[40px] text-slate-700 mb-1">event_available</span>
+            <h3 className="text-xs font-bold text-slate-400">No upcoming sessions scheduled</h3>
           </section>
         )}
-      </div>
+      </section>
     </>
   )
 }
