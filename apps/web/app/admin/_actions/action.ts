@@ -7,6 +7,9 @@ import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '@/lib/server';
 import { requireRole } from '@/lib/dal';
 
+import { validateCoachData, normalizeIndianMobile } from '@/lib/validations/signup';
+import { DEFAULT_PRESET_PASSWORD } from '@/lib/constants/auth';
+
 /**
  * Generates a secure temporary password.
  * In a real-world scenario, you would email this to the user.
@@ -97,26 +100,39 @@ export async function getUsersByCategory(category: 'players' | 'coaches' | 'pend
   });
 }
 
-export async function addPlayerAdmin(formData: FormData): Promise<{ success: false; error: string } | { success: true }> {
+
+export async function addPlayerAdmin(formData: FormData): Promise<{ success: false; error: string } | { success: true; email: string; passwordUsed: string }> {
   await requireRole('admin');
 
-  const res = await signup(formData, true);
+  const res = await signup(formData);
   if (!res.success) return { success: false, error: res.error };
   revalidatePath('/admin');
-  return { success: true };
+  return { success: true, email: res.email, passwordUsed: res.passwordUsed || DEFAULT_PRESET_PASSWORD };
 }
 
-export async function addCoachAdmin(formData: FormData): Promise<{ success: false; error: string } | { success: true }> {
+export async function addCoachAdmin(formData: FormData): Promise<{ success: false; error: string } | { success: true; email: string; passwordUsed: string }> {
   await requireRole('admin');
 
   const email = formData.get('email')?.toString().trim() || '';
   const firstName = formData.get('firstName')?.toString().trim() || '';
   const lastName = formData.get('lastName')?.toString().trim() || '';
-  const mobileNumber = formData.get('mobileNumber')?.toString().trim() || '';
+  const mobileNumber = normalizeIndianMobile(formData.get('mobileNumber')?.toString() || '');
   const locationId = formData.get('locationId')?.toString().trim() || '';
+  let password = formData.get('password')?.toString() || '';
+  if (!password) {
+    password = DEFAULT_PRESET_PASSWORD;
+  }
 
-  if (!email || !firstName || !lastName || !mobileNumber || !locationId) {
-    return { success: false as const, error: 'Please fill in all required fields' };
+  const validation = validateCoachData({
+    firstName,
+    lastName,
+    email,
+    mobileNumber,
+    locationId,
+  });
+
+  if (!validation.isValid && validation.error) {
+    return { success: false, error: validation.error };
   }
 
   const academy = await prisma.academy.findFirst({
@@ -125,21 +141,25 @@ export async function addCoachAdmin(formData: FormData): Promise<{ success: fals
   });
 
   if (!academy) {
-    return { success: false as const, error: 'No active academy available' };
+    return { success: false, error: 'No active academy available' };
   }
 
-  const tempPassword = generateTempPassword();
-  const supabaseAdmin = createSupabaseClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  );
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
-  const { data: authData, error: authError } = await supabaseAdmin.auth.signUp({
-    email,
-    password: tempPassword,
-    options: {
-      data: {
+  let authUserId: string | null = null;
+
+  if (serviceRoleKey) {
+    const supabaseAdmin = createSupabaseClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+
+    const { data: adminData } = await supabaseAdmin.auth.admin.createUser({
+      email,
+      password: password,
+      email_confirm: true,
+      user_metadata: {
         isFromAdmin: true,
         role: 'coach',
         first_name: firstName,
@@ -147,17 +167,84 @@ export async function addCoachAdmin(formData: FormData): Promise<{ success: fals
         mobile_number: mobileNumber,
         location_id: locationId,
       },
+    });
+
+    if (adminData?.user) {
+      authUserId = adminData.user.id;
+    }
+  }
+
+  if (!authUserId) {
+    const supabaseClient = createSupabaseClient(supabaseUrl, anonKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+
+    const { data: signUpData, error: signUpError } = await supabaseClient.auth.signUp({
+      email,
+      password: password,
+      options: {
+        data: {
+          isFromAdmin: true,
+          role: 'coach',
+          first_name: firstName,
+          last_name: lastName,
+          mobile_number: mobileNumber,
+          location_id: locationId,
+        },
+      },
+    });
+
+    if (signUpError || !signUpData?.user) {
+      return { success: false, error: signUpError?.message ?? 'Unable to create auth account for coach' };
+    }
+    authUserId = signUpData.user.id;
+  }
+
+  // Create public.users entry with status ACTIVE
+  await prisma.user.upsert({
+    where: { id: authUserId },
+    update: {
+      first_name: firstName,
+      last_name: lastName,
+      mobile_number: mobileNumber,
+      status: 'ACTIVE',
+    },
+    create: {
+      id: authUserId,
+      email,
+      first_name: firstName,
+      last_name: lastName,
+      mobile_number: mobileNumber,
+      status: 'ACTIVE',
     },
   });
 
-  if (authError || !authData?.user) {
-    return { success: false as const, error: authError?.message ?? 'Unable to create auth account for coach' };
-  }
+  // Assign coach role
+  await prisma.userAcademyRole.upsert({
+    where: { id: authUserId },
+    update: { permissions: ['coach'] },
+    create: {
+      user_id: authUserId,
+      academy_id: academy.id,
+      permissions: ['coach'],
+    },
+  });
 
-  await prisma.coachLocation.create({
-    data: { user_id: authData.user.id, location_id: locationId },
+  // Assign coach location
+  await prisma.coachLocation.upsert({
+    where: {
+      user_id_location_id: {
+        user_id: authUserId,
+        location_id: locationId,
+      },
+    },
+    update: {},
+    create: {
+      user_id: authUserId,
+      location_id: locationId,
+    },
   });
 
   revalidatePath('/admin');
-  return { success: true };
+  return { success: true, email, passwordUsed: password };
 }

@@ -151,3 +151,37 @@ export function validateSignupData(
 
   return { isValid: true, error: null };
 }
+
+export interface CoachInputData {
+  firstName: string;
+  lastName: string;
+  email: string;
+  mobileNumber: string;
+  locationId: string;
+}
+
+export function validateCoachData(data: CoachInputData): ValidationResult {
+  const { firstName, lastName, email, mobileNumber, locationId } = data;
+
+  if (!firstName || !lastName || !email || !mobileNumber || !locationId) {
+    return { isValid: false, error: 'Please fill in all required fields' };
+  }
+
+  const firstNameVal = validateName(firstName, 'First Name');
+  if (!firstNameVal.isValid) return firstNameVal;
+
+  const lastNameVal = validateName(lastName, 'Last Name');
+  if (!lastNameVal.isValid) return lastNameVal;
+
+  const emailVal = validateEmail(email);
+  if (!emailVal.isValid) return emailVal;
+
+  const mobileVal = validateMobileNumber(mobileNumber);
+  if (!mobileVal.isValid) return mobileVal;
+
+  if (!locationId.trim()) {
+    return { isValid: false, error: 'Please select a location' };
+  }
+
+  return { isValid: true, error: null };
+}

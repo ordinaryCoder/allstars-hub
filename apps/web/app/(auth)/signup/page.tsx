@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { signup, getLocations } from './_actions/action';
 import { ACADEMY_NAME } from '@/lib/constant';
-import { DobInput } from './_components/DobInput';
+import { DobInput } from '@/components/form/DobInput';
 import { AuthLayoutContainer } from '@/components/auth/AuthLayoutContainer';
 import { PasswordInput } from '@/components/auth/PasswordInput';
 import {

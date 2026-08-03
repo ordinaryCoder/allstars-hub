@@ -63,8 +63,18 @@ export async function HomeTab() {
   let lastMonthAttendance = 0;
 
   try {
-    thisMonthAttendance = await prisma.attendance.count({ where: { marked_at: { gte: startOfThisMonth } } });
-    lastMonthAttendance = await prisma.attendance.count({ where: { marked_at: { gte: startOfLastMonth, lt: startOfThisMonth } } });
+    thisMonthAttendance = await prisma.attendance.count({
+      where: {
+        marked_at: { gte: startOfThisMonth },
+        status: { in: ['PRESENT', 'LATE'] },
+      },
+    });
+    lastMonthAttendance = await prisma.attendance.count({
+      where: {
+        marked_at: { gte: startOfLastMonth, lt: startOfThisMonth },
+        status: { in: ['PRESENT', 'LATE'] },
+      },
+    });
   } catch (error) {
     console.error("Attendance query failed:", error);
   }
@@ -87,6 +97,23 @@ export async function HomeTab() {
     select: { id: true, name: true }
   });
 
+  // Efficient single query to count active players per location
+  const locationPlayerCounts: Record<string, number> = {};
+  try {
+    const activePlayersPerLocation = await prisma.player.groupBy({
+      by: ['location_id'],
+      where: { is_active: true },
+      _count: { _all: true },
+    });
+    activePlayersPerLocation.forEach((group) => {
+      if (group.location_id) {
+        locationPlayerCounts[group.location_id] = group._count._all;
+      }
+    });
+  } catch (e) {
+    console.error("Location player counts fetch failed", e);
+  }
+
   // Get boundaries for the current week (Monday - Sunday)
   const dayOfWeek = now.getDay() || 7;
   const startOfWeek = new Date(now);
@@ -96,11 +123,15 @@ export async function HomeTab() {
   endOfWeek.setDate(startOfWeek.getDate() + 6);
   endOfWeek.setHours(23, 59, 59, 999);
 
-  let weeklyAttendances: { marked_at: Date; session: { location_id: string } }[] = [];
+  let weeklyAttendances: { player_id: string; marked_at: Date; session: { location_id: string } }[] = [];
   try {
     weeklyAttendances = await prisma.attendance.findMany({
-      where: { marked_at: { gte: startOfWeek, lte: endOfWeek } },
+      where: {
+        marked_at: { gte: startOfWeek, lte: endOfWeek },
+        status: { in: ['PRESENT', 'LATE'] },
+      },
       select: {
+        player_id: true,
         marked_at: true,
         session: { select: { location_id: true } }
       }
@@ -122,21 +153,35 @@ export async function HomeTab() {
     const todaysSessions = await prisma.session.findMany({
       where: { start_time: { gte: startOfToday, lte: endOfToday } },
       select: {
+        id: true,
         location_id: true,
-        _count: { select: { attendance: true } }
       }
     });
 
-    const sessionLocationIds = Array.from(new Set(todaysSessions.map(s => s.location_id).filter(Boolean)));
-    if (sessionLocationIds.length > 0) {
-      expectedPlayersCount = await prisma.player.count({
-        where: { location_id: { in: sessionLocationIds }, is_active: true }
+    const todaysSessionIds = todaysSessions.map(s => s.id);
+    if (todaysSessionIds.length > 0) {
+      const totalMarkedToday = await prisma.attendance.count({
+        where: { session_id: { in: todaysSessionIds } }
       });
-    }
 
-    todaysSessions.forEach(session => {
-      attendedPlayersCount += session._count.attendance;
-    });
+      attendedPlayersCount = await prisma.attendance.count({
+        where: {
+          session_id: { in: todaysSessionIds },
+          status: { in: ['PRESENT', 'LATE'] }
+        }
+      });
+
+      if (totalMarkedToday > 0) {
+        expectedPlayersCount = totalMarkedToday;
+      } else {
+        const sessionLocationIds = Array.from(new Set(todaysSessions.map(s => s.location_id).filter(Boolean)));
+        if (sessionLocationIds.length > 0) {
+          expectedPlayersCount = await prisma.player.count({
+            where: { location_id: { in: sessionLocationIds }, is_active: true }
+          });
+        }
+      }
+    }
   } catch (e) {
     console.error("Today's attendance fetch failed", e);
   }
@@ -146,53 +191,36 @@ export async function HomeTab() {
     : 0;
   const todaysMetric = getAttendanceMetric(todaysAttendancePercent);
 
-  // Active players in live sessions (location based)
-  let activeSessionsPlayersCount = 0;
+  // Active players KPI (count of active players who have attended 1+ sessions)
+  let activePlayersCount = 0;
   try {
-    const activeSessions = await prisma.session.findMany({
+    activePlayersCount = await prisma.player.count({
       where: {
-        start_time: { lte: now },
-        end_time: { gte: now }
+        is_active: true,
+        attendance: {
+          some: {
+            status: { in: ['PRESENT', 'LATE'] },
+          },
+        },
       },
-      select: {
-        location_id: true,
-        _count: { select: { attendance: true } }
-      }
     });
-
-    const activeLocationIds = Array.from(new Set(activeSessions.map(s => s.location_id).filter(Boolean)));
-    if (activeLocationIds.length > 0) {
-      activeSessionsPlayersCount = await prisma.player.count({
-        where: { location_id: { in: activeLocationIds }, is_active: true }
-      });
-    }
   } catch (e) {
-    console.error("Active sessions fetch failed", e);
+    console.error("Active players fetch failed", e);
   }
 
-  // Upcoming sessions
-  let nextCoachingSessions: NextCoachingSessionItem[] = [];
+  // Upcoming sessions (fetches any future sessions planned for any location chronologically)
+  let nextCoachingSessions: { id: string; start_time: Date; location: { name: string } | null }[] = [];
   try {
-    const futureSessions = await prisma.session.findMany({
+    nextCoachingSessions = await prisma.session.findMany({
       where: { start_time: { gt: now } },
       orderBy: { start_time: 'asc' },
-      take: 10,
+      take: 5,
       select: {
         id: true,
         start_time: true,
         location: { select: { name: true } }
       }
     });
-
-    if (futureSessions.length > 0) {
-      const firstSessionTime = futureSessions[0].start_time;
-      const targetYear = firstSessionTime.getFullYear();
-      const targetMonth = firstSessionTime.getMonth();
-      const targetDate = firstSessionTime.getDate();
-      const targetHour = firstSessionTime.getHours();
-
-      nextCoachingSessions = futureSessions.filter((s) => s.start_time.getFullYear() === targetYear && s.start_time.getMonth() === targetMonth && s.start_time.getDate() === targetDate && s.start_time.getHours() === targetHour);
-    }
   } catch (e) {
     console.error("Upcoming sessions fetch failed", e);
   }
@@ -219,16 +247,16 @@ export async function HomeTab() {
         </div>
         <div className="bg-white rounded-2xl p-3 shadow-sm border border-slate-100 flex flex-col items-center text-center">
           <span className="text-xs font-semibold text-slate-500 mb-1">Active</span>
-          <span className="text-3xl font-bold text-slate-900">{activeSessionsPlayersCount}</span>
+          <span className="text-3xl font-bold text-slate-900">{activePlayersCount}</span>
           <div className="flex items-center justify-center gap-1 text-amber-500 mt-1">
             <span className="material-symbols-outlined text-[12px]">bolt</span>
-            <span className="text-[10px] font-bold">Playing</span>
           </div>
         </div>
       </section>
 
       <WeeklyAttendanceChart
         locations={locations}
+        locationPlayerCounts={locationPlayerCounts}
         weeklyAttendances={weeklyAttendances}
         totalPlayers={totalPlayers}
       />
@@ -241,10 +269,12 @@ export async function HomeTab() {
         {nextCoachingSessions.length > 0 ? (
           nextCoachingSessions.map((session) => {
             const title = session.location?.name ? `${session.location.name} Session` : 'Training Session';
-            const time = session.start_time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const formattedDate = session.start_time.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+            const formattedTime = session.start_time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const timeDisplay = `${formattedDate} • ${formattedTime}`;
             const locationName = session.location?.name || 'Unknown Location';
             return (
-              <UpcomingSessionCard key={session.id} title={title} time={time} locationName={locationName} />
+              <UpcomingSessionCard key={session.id} title={title} time={timeDisplay} locationName={locationName} />
             );
           })
         ) : (

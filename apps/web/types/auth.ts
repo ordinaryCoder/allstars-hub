@@ -16,7 +16,7 @@ export interface LoginState {
 
 export type SignupState =
   | { success: false; error: string }
-  | { success: true; email: string };
+  | { success: true; email: string; passwordUsed?: string };
 
 export interface LocationOption {
   id: string;

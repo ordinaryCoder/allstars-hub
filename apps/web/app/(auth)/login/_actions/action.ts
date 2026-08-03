@@ -35,8 +35,38 @@ export async function login(
     const jwt = authData.session.access_token;
     const payload = parseJwtPayload<JWTPayload>(jwt);
 
-    const status = payload?.status || 'PENDING';
-    const roles = payload?.roles || [];
+    let status = payload?.status;
+    let roles = payload?.roles || [];
+
+    // Fallback: If JWT hook claims are missing (e.g. Supabase Auth Hook not registered or untoggled),
+    // query database directly for user status and roles.
+    if (!status || !roles || roles.length === 0) {
+      try {
+        const dbUser = await prisma.user.findUnique({
+          where: { id: authData.user.id },
+          select: {
+            status: true,
+            academy_roles: {
+              select: { permissions: true },
+            },
+          },
+        });
+
+        if (dbUser) {
+          status = dbUser.status;
+          const rawPermissions = dbUser.academy_roles?.[0]?.permissions;
+          if (Array.isArray(rawPermissions)) {
+            roles = rawPermissions.map((r) => String(r));
+          } else if (typeof rawPermissions === 'string') {
+            roles = [rawPermissions];
+          }
+        }
+      } catch (dbErr) {
+        console.error('Error fetching DB fallback role/status for login:', dbErr);
+      }
+    }
+
+    status = status || 'PENDING';
 
     const targetRoute = getRoleRedirectPath(
       roles,
