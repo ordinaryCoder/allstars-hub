@@ -1,15 +1,19 @@
 import Link from 'next/link';
 import { createClient } from '../../../lib/server';
-import { prisma } from '../../../../../packages/database';
+import { prisma } from '@packages/database';
 import { redirect } from 'next/navigation';
 import { requireRole } from '../../../lib/dal';
-import DateFilterDropdown from './DateFilterDropdown';
+import { CoachBottomNav } from '@/components/layout/CoachBottomNav';
+import {
+  AttendanceReportView,
+  RecordedSessionItem,
+  LowAttendancePlayerItem,
+} from './_components/AttendanceReportView';
+import { PerformanceData } from '../_components/PerformanceTrack';
 
-export default async function AttendanceReportPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ days?: string }>;
-}) {
+export const revalidate = 30;
+
+export default async function AttendanceReportPage() {
   const supabase = await createClient();
   const {
     data: { user },
@@ -20,178 +24,206 @@ export default async function AttendanceReportPage({
   }
   await requireRole(user.id, 'coach');
 
-  const params = await searchParams;
-  const days = Number(params.days) || 30;
-  const startDate = new Date();
-  startDate.setDate(startDate.getDate() - days);
+  const now = new Date();
+  const today = new Date(now);
+  today.setHours(0, 0, 0, 0);
 
-  const sessions = await prisma.session.findMany({
+  const thirtyDaysAgo = new Date(today);
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+  const sevenDaysAgo = new Date(today);
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+  // 1. Fetch total active players in the coach's assigned locations
+  const coachLocations = await prisma.coachLocation.findMany({
+    where: { user_id: user.id },
+    select: { location_id: true },
+  });
+  const locationIds = coachLocations.map((cl) => cl.location_id);
+
+  const activeLocationPlayers = await prisma.player.findMany({
     where: {
-      coach_id: user.id,
-      start_time: { gte: startDate },
+      location_id: { in: locationIds },
+      is_active: true,
+    },
+    select: { id: true },
+  });
+
+  const locationPlayerIdsSet = new Set(activeLocationPlayers.map((p) => p.id));
+  const totalLocationPlayersCount = locationPlayerIdsSet.size;
+
+  // 2. Fetch past performance sessions (last 30 days) for Weekly & Monthly Performance Track
+  const pastPerformanceSessions = await prisma.session.findMany({
+    where: {
+      OR: [
+        { coach_id: user.id },
+        { created_by: user.id },
+      ],
+      start_time: { gte: thirtyDaysAgo },
     },
     include: {
-      attendance: { where: { status: 'PRESENT' } },
-      batches: { include: { batch: { include: { players: { select: { player_id: true } } } } } },
+      attendance: true,
     },
   });
 
-  const playerStats = new Map<string, { expected: number; attended: number }>();
+  let weeklyMarked = 0;
+  let weeklyPresent = 0;
+  const weeklyAttendedPlayers = new Set<string>();
 
-  for (const session of sessions) {
-    const expectedPlayerIds = new Set<string>();
-    for (const sb of session.batches) {
-      for (const pb of sb.batch.players) {
-        expectedPlayerIds.add(pb.player_id);
+  let monthlyMarked = 0;
+  let monthlyPresent = 0;
+  const monthlyAttendedPlayers = new Set<string>();
+
+  pastPerformanceSessions.forEach((session) => {
+    const isWeekly = session.start_time >= sevenDaysAgo;
+
+    session.attendance.forEach((att) => {
+      monthlyMarked++;
+      if (att.status === 'PRESENT' || att.status === 'LATE') {
+        monthlyPresent++;
+        if (locationPlayerIdsSet.has(att.player_id)) {
+          monthlyAttendedPlayers.add(att.player_id);
+        }
       }
-    }
 
-    for (const playerId of expectedPlayerIds) {
-      const stats = playerStats.get(playerId) || { expected: 0, attended: 0 };
-      stats.expected++;
-      playerStats.set(playerId, stats);
-    }
-
-    for (const attendance of session.attendance) {
-      if (playerStats.has(attendance.player_id)) {
-        playerStats.get(attendance.player_id)!.attended++;
+      if (isWeekly) {
+        weeklyMarked++;
+        if (att.status === 'PRESENT' || att.status === 'LATE') {
+          weeklyPresent++;
+          if (locationPlayerIdsSet.has(att.player_id)) {
+            weeklyAttendedPlayers.add(att.player_id);
+          }
+        }
       }
-    }
-  }
-
-  const allStats = Array.from(playerStats.values());
-  const totalAttended = allStats.reduce((sum, s) => sum + s.attended, 0);
-  const totalExpected = allStats.reduce((sum, s) => sum + s.expected, 0);
-  const avgAttendance = totalExpected > 0 ? Math.round((totalAttended / totalExpected) * 100) : 0;
-
-  const perfectRecordPlayers = allStats.filter(s => s.expected > 0 && s.expected === s.attended).length;
-
-  const lowAttendancePlayersData = Array.from(playerStats.entries())
-    .map(([playerId, stats]) => {
-      if (stats.expected === 0) return null;
-      const percentage = (stats.attended / stats.expected) * 100;
-      if (percentage < 80) { // Low attendance threshold: 80%
-        return {
-          playerId,
-          attendancePercentage: Math.round(percentage),
-          absences: stats.expected - stats.attended,
-        };
-      }
-      return null;
-    })
-    .filter((p): p is NonNullable<typeof p> => p !== null)
-    .sort((a, b) => a.attendancePercentage - b.attendancePercentage);
-
-  const lowAttendancePlayerDetails = await prisma.player.findMany({
-    where: { id: { in: lowAttendancePlayersData.map(p => p.playerId) } },
-    select: {
-      id: true,
-      first_name: true,
-      last_name: true,
-      batches: { include: { batch: { select: { name: true } } } },
-    },
+    });
   });
-  const playerDetailsMap = new Map(lowAttendancePlayerDetails.map(p => [p.id, p]));
 
-  const lowAttendancePlayers = lowAttendancePlayersData.map(p => {
-    const details = playerDetailsMap.get(p.playerId);
+  const performanceData: PerformanceData = {
+    weeklyAvgAttendance: weeklyMarked > 0 ? Math.round((weeklyPresent / weeklyMarked) * 100) : 0,
+    monthlyAvgAttendance: monthlyMarked > 0 ? Math.round((monthlyPresent / monthlyMarked) * 100) : 0,
+    weeklyActivePlayers: weeklyAttendedPlayers.size,
+    monthlyActivePlayers: monthlyAttendedPlayers.size,
+    totalLocationPlayers: totalLocationPlayersCount,
+  };
+
+  // 3. Fetch all recorded sessions for the coach (no batch query for Phase 1)
+  const sessions = await prisma.session.findMany({
+    where: {
+      OR: [
+        { coach_id: user.id },
+        { created_by: user.id },
+      ],
+    },
+    include: {
+      location: true,
+      attendance: {
+        include: {
+          player: true,
+        },
+      },
+    },
+    orderBy: { start_time: 'desc' },
+    take: 100,
+  });
+
+  const recordedSessions: RecordedSessionItem[] = sessions.map((session) => {
+    const dateStr = new Date(session.start_time).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+    const timeStr = new Date(session.start_time).toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
+
+    const sessionPresent = session.attendance.filter(
+      (a) => a.status === 'PRESENT' || a.status === 'LATE'
+    ).length;
+    const sessionTotal = session.attendance.length;
+    const sessionRate = sessionTotal > 0 ? Math.round((sessionPresent / sessionTotal) * 100) : 0;
+    const sessionTitle = session.location?.name ? `${session.location.name} Session` : 'General Session';
+
     return {
-      id: p.playerId,
-      name: `${details?.first_name} ${details?.last_name}`,
-      batch: details?.batches[0]?.batch.name || 'N/A',
-      attendancePercentage: p.attendancePercentage,
-      absences: p.absences,
+      id: session.id,
+      locationName: session.location?.name || 'Assigned Location',
+      dateStr,
+      timeStr,
+      sessionPresent,
+      sessionTotal,
+      sessionRate,
     };
   });
 
-  return (
-    <>
-      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-      <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
-      <style dangerouslySetInnerHTML={{ __html: `
-        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
-        body { font-family: 'Inter', sans-serif; }
-        .hide-scrollbar::-webkit-scrollbar { display: none; }
-        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-      `}} />
+  // 4. Calculate low attendance players (< 80%)
+  const playerStatsMap = new Map<
+    string,
+    { name: string; locationName: string; expected: number; attended: number }
+  >();
 
-      <div className="bg-slate-50 text-slate-900 antialiased min-h-screen font-sans">
-        <div className="max-w-[448px] mx-auto min-h-screen bg-slate-50 flex flex-col relative pb-8">
+  sessions.forEach((session) => {
+    session.attendance.forEach((att) => {
+      const playerId = att.player_id;
+      const playerName = att.player ? `${att.player.first_name} ${att.player.last_name}` : 'Player';
+      const locationName = session.location?.name || 'Assigned Location';
+
+      const existing = playerStatsMap.get(playerId) || {
+        name: playerName,
+        locationName,
+        expected: 0,
+        attended: 0,
+      };
+      existing.expected += 1;
+      if (att.status === 'PRESENT' || att.status === 'LATE') {
+        existing.attended += 1;
+      }
+      playerStatsMap.set(playerId, existing);
+    });
+  });
+
+  const lowAttendancePlayers: LowAttendancePlayerItem[] = Array.from(playerStatsMap.entries())
+    .map(([id, data]) => {
+      const percentage = data.expected > 0 ? Math.round((data.attended / data.expected) * 100) : 0;
+      return {
+        id,
+        name: data.name,
+        locationName: data.locationName,
+        attendancePercentage: percentage,
+        absences: data.expected - data.attended,
+      };
+    })
+    .filter((p) => p.attendancePercentage < 80 && p.absences > 0)
+    .sort((a, b) => a.attendancePercentage - b.attendancePercentage);
+
+  return (
+    <div className="bg-slate-50 text-slate-900 antialiased min-h-screen font-sans">
+      <div className="max-w-[448px] mx-auto min-h-screen bg-slate-50 flex flex-col relative pb-24 shadow-sm border-x border-slate-200/50">
 
         {/* TopAppBar */}
-        <header className="flex items-center justify-between px-4 h-16 w-full sticky top-0 z-50 bg-white border-b border-black/10 shadow-sm">
-          <div className="flex items-center gap-4 w-full">
+        <header className="flex items-center justify-between px-4 h-16 w-full sticky top-0 z-50 bg-white border-b border-slate-200 shadow-sm">
+          <div className="flex items-center gap-3">
             <Link 
               href="/coach" 
               aria-label="Go back" 
-              className="flex items-center justify-center w-11 h-11 -ml-2 rounded-full text-slate-900 active:opacity-70 transition-opacity duration-150"
+              className="flex items-center justify-center w-9 h-9 rounded-full text-slate-900 hover:bg-slate-100 active:scale-95 transition-all"
             >
-              <span className="material-symbols-outlined">arrow_back</span>
+              <span className="material-symbols-outlined text-[22px]">arrow_back</span>
             </Link>
-            <h1 className="font-semibold text-lg tracking-tight text-slate-900">Attendance Report</h1>
+            <h1 className="font-bold text-lg tracking-tight text-slate-900">Attendance Report</h1>
           </div>
-          <button className="flex items-center justify-center w-11 h-11 -mr-2 rounded-full text-slate-900 active:opacity-70 transition-opacity duration-150">
-              <span className="material-symbols-outlined text-slate-900">ios_share</span>
-            </button>
         </header>
 
-        <main className="px-4 py-6 space-y-6">
-          <section className="hide-scrollbar flex overflow-x-auto gap-2 -mx-4 px-4 pb-2">
-            <DateFilterDropdown currentDays={days} />
-          </section>
-
-          <section className="grid grid-cols-2 gap-4">
-            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-between">
-              <div>
-                <p className="text-slate-500 text-sm mb-1">Avg Attendance</p>
-                <h2 className="text-4xl font-bold text-green-500">{avgAttendance}%</h2>
-              </div>
-              <div className="mt-4 h-8 w-full flex items-end gap-1">
-                <div className="flex-1 bg-green-100 h-2/3 rounded-t-sm"></div>
-                <div className="flex-1 bg-green-100 h-3/4 rounded-t-sm"></div>
-                <div className="flex-1 bg-green-200 h-1/2 rounded-t-sm"></div>
-                <div className="flex-1 bg-green-300 h-2/3 rounded-t-sm"></div>
-                <div className="flex-1 bg-green-500 h-full rounded-t-sm"></div>
-              </div>
-            </div>
-            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-between">
-              <div>
-                <p className="text-slate-500 text-sm mb-1">Perfect Record</p>
-                <h2 className="text-4xl font-bold text-slate-900">{perfectRecordPlayers} Players</h2>
-              </div>
-            </div>
-          </section>
-
-          <section className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold">Low Attendance Flags</h3>
-              <span className="material-symbols-outlined text-red-500">warning</span>
-            </div>
-            <div className="space-y-3">
-              {lowAttendancePlayers.length > 0 ? (
-                lowAttendancePlayers.map(player => (
-                  <div key={player.id} className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <img alt={player.name} className="w-10 h-10 rounded-full object-cover" src={`https://api.dicebear.com/8.x/initials/svg?seed=${player.name}`} />
-                      <div>
-                        <h4 className="font-medium">{player.name}</h4>
-                        <p className="text-sm text-slate-500">{player.batch}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-2xl font-bold text-red-500">{player.attendancePercentage}%</p>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase">{player.absences} Absences</p>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <p className="text-sm text-slate-500 text-center py-4">No players with low attendance.</p>
-              )}
-            </div>
-          </section>
+        <main className="px-4 py-6 flex-1">
+          <AttendanceReportView
+            performanceData={performanceData}
+            recordedSessions={recordedSessions}
+            lowAttendancePlayers={lowAttendancePlayers}
+          />
         </main>
-        </div>
+
+        <CoachBottomNav currentTab="reports" />
       </div>
-    </>
+    </div>
   );
 }

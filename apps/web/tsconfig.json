@@ -26,6 +26,9 @@
       "@/*": [
         "./*"
       ],
+      "@packages/database": [
+        "../../packages/database"
+      ],
       "@packages/*": [
         "../../packages/*"
       ],

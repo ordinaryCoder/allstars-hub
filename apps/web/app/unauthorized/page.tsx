@@ -1,6 +1,5 @@
 import Link from 'next/link';
-import { createClient } from '../../lib/server';
-import { redirect } from 'next/navigation';
+import { signOut } from '@/app/(auth)/_actions/auth';
 
 export default function UnauthorizedPage({
   searchParams,
@@ -10,23 +9,8 @@ export default function UnauthorizedPage({
   const resolvedParams: string | undefined = searchParams?.email;
   const email: string | undefined = resolvedParams;
 
-  async function handleSignOut() {
-    'use server';
-    const supabase = await createClient();
-    await supabase.auth.signOut();
-    redirect('/login');
-  }
-
   return (
     <>
-      {/* Ensure external fonts & icons load on this specific page */}
-      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-      <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
-      <style dangerouslySetInnerHTML={{ __html: `
-        .material-symbols-outlined {
-          font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-        }
-      `}} />
 
       <div className="bg-gray-50 flex flex-col items-center justify-center min-h-screen font-['Inter']">
         {/* Mobile PWA Canvas */}
@@ -71,7 +55,7 @@ export default function UnauthorizedPage({
             </div>
 
             {/* Primary Action */}
-            <form action={handleSignOut} className="w-full">
+            <form action={signOut} className="w-full">
               <button type="submit" className="w-full h-[44px] bg-[#000000] text-[#ffffff] rounded-xl text-[14px] font-medium leading-[20px] shadow-md active:scale-[0.98] transition-all flex items-center justify-center gap-2 hover:opacity-90">
                 <span className="material-symbols-outlined" data-icon="login">login</span>
                 Go to Login Page

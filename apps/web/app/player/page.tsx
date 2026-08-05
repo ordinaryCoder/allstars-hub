@@ -1,12 +1,13 @@
-import { TopAppBar } from './TopAppBar';
-import { NextCoachingSession } from './NextCoachingSession';
-import { AttendanceHealth } from './AttendanceHealth';
-import { CalendarWidget } from './CalendarWidget';
-import { BottomNav } from './BottomNav';
-import { createClient } from '../../lib/server';
+import { TopAppBar } from '@/components/layout/TopAppBar';
+import { NextCoachingSession } from './_components/NextCoachingSession';
+import { AttendanceHealth } from './_components/AttendanceHealth';
+import { CalendarWidget } from './_components/CalendarWidget';
+import { BottomNav } from '@/components/layout/BottomNav';
+import { createClient } from '@/lib/server';
 import { redirect } from 'next/navigation';
-import { requireRole } from '../../lib/dal';
-import { prisma } from '../../../../packages/database';
+import { requireRole } from '@/lib/dal';
+import { prisma } from '@packages/database';
+import { signOut } from '@/app/(auth)/_actions/auth';
 
 export default async function PlayerPage() {
   const supabase = await createClient();
@@ -90,22 +91,10 @@ export default async function PlayerPage() {
     }
   }) : null;
 
-  async function signOut() {
-    'use server';
-    const supabase = await createClient();
-    await supabase.auth.signOut();
-    redirect('/login');
-  }
+
 
   return (
     <>
-      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-      <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
-      <style dangerouslySetInnerHTML={{ __html: `
-        .material-symbols-outlined {
-          font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-        }
-      `}} />
       <div className="bg-slate-100 flex justify-center min-h-screen font-sans text-slate-900 antialiased">
         <div className="w-full max-w-[448px] bg-slate-50 min-h-screen pb-24 relative shadow-2xl shadow-slate-200 flex flex-col overflow-x-hidden">
           <TopAppBar userName={userName} initials={initials} signOut={signOut} />

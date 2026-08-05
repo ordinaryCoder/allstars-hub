@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '../lib/server';
-import { prisma } from '../../../packages/database';
+import { prisma } from '@packages/database';
+import { getRoleRedirectPath } from '@/lib/auth-utils';
 
 export default async function HomePage() {
   const supabase = await createClient();
@@ -19,18 +20,12 @@ export default async function HomePage() {
     redirect('/login');
   }
 
-  if (dbUser.status === 'PENDING') {
-    redirect(`/pending?email=${encodeURIComponent(dbUser.email)}`);
-  }
-
   const perms = dbUser.academy_roles?.[0]?.permissions;
-  const permStr = Array.isArray(perms) ? perms.join(',').toLowerCase() : String(perms || '').toLowerCase();
+  const targetRoute = getRoleRedirectPath(
+    Array.isArray(perms) ? (perms as string[]) : String(perms || ''),
+    dbUser.status,
+    dbUser.email
+  );
 
-  if (permStr.includes('admin')) {
-    redirect('/admin');
-  } else if (permStr.includes('coach')) {
-    redirect('/coach');
-  } else {
-    redirect('/player');
-  }
+  redirect(targetRoute);
 }

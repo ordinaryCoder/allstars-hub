@@ -2,7 +2,7 @@
 CREATE TYPE "ApprovalStatus" AS ENUM ('PENDING', 'ACTIVE', 'INACTIVE');
 
 -- CreateEnum
-CREATE TYPE "AttendanceStatus" AS ENUM ('PRESENT', 'ABSENT', 'LEAVE');
+CREATE TYPE "AttendanceStatus" AS ENUM ('PRESENT', 'ABSENT', 'LATE');
 
 -- CreateTable
 CREATE TABLE "academies" (
@@ -526,8 +526,10 @@ $$;
 -- Drop the old trigger if it exists
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 -- Create a new trigger that fires on user email confirmation
+-- IMPORTANT: Watch email_confirmed_at — GoTrue writes to this column on email confirmation.
+-- confirmed_at is a generated column (LEAST of email/phone confirmed_at) and may not fire AFTER UPDATE.
 CREATE TRIGGER on_auth_user_confirmed
-  AFTER UPDATE OF confirmed_at ON auth.users
+  AFTER UPDATE OF email_confirmed_at ON auth.users
   FOR EACH ROW
-  WHEN (OLD.confirmed_at IS NULL AND NEW.confirmed_at IS NOT NULL)
+  WHEN (OLD.email_confirmed_at IS NULL AND NEW.email_confirmed_at IS NOT NULL)
   EXECUTE FUNCTION public.handle_new_user();

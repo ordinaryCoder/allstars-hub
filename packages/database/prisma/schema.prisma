@@ -171,7 +171,7 @@ model PlayerBatch {
 enum AttendanceStatus {
   PRESENT
   ABSENT
-  LEAVE
+  LATE
 }
 
 model Attendance {
