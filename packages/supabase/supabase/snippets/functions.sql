@@ -2,7 +2,10 @@
 --  ADD USER ON EMAIL CONFIRMATION TRIGGER
 -- =======================================================
 
--- Function to insert a new user into the public tables after email verification
+-- Function to insert a new user into the public tables after email verification.
+-- Fires AFTER UPDATE OF email_confirmed_at ON auth.users,
+-- only when email_confirmed_at transitions from NULL → non-NULL (i.e. the user
+-- clicked their confirmation link).
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -10,94 +13,127 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-  academy_id_to_use UUID;
-  user_role TEXT;
-  location_id_to_use UUID;
-  new_player_id UUID;
-  u_first_name TEXT;
-  u_last_name TEXT;
+  v_academy_id   UUID;
+  v_location_id  UUID;
+  v_player_id    UUID;
+  v_role         TEXT;
+  v_first_name   TEXT;
+  v_last_name    TEXT;
+  v_dob          DATE;
 BEGIN
-  -- 1. Find the first active academy to associate with the new user
-  SELECT id INTO academy_id_to_use FROM public.academies WHERE is_active = TRUE LIMIT 1;
-
-  -- 2. Extract the role and location from the Supabase auth metadata
-  user_role := NEW.raw_user_meta_data ->> 'role';
-  location_id_to_use := (NEW.raw_user_meta_data ->> 'location_id')::UUID;
-  
-  -- Fallback in case role is missing from the frontend request
-  IF user_role IS NULL THEN
-    user_role := 'player';
+  -- ── 0. IDEMPOTENCY GUARD ───────────────────────────────────────────────────
+  -- If the user row already exists in public.users (e.g. trigger fired twice,
+  -- or admin created the user manually), do nothing and return safely.
+  IF EXISTS (SELECT 1 FROM public.users WHERE id = NEW.id) THEN
+    RETURN NEW;
   END IF;
 
-  -- 3. Determine the User's first and last name based on their role
-  IF user_role = 'parent' THEN
-    -- Parents only provide 'guardian_name' in the metadata. 
-    -- Because last_name is required in the Prisma schema, we must pass an empty string.
-    u_first_name := NEW.raw_user_meta_data ->> 'guardian_name';
-    u_last_name := ''; 
+  -- ── 1. RESOLVE ACADEMY ────────────────────────────────────────────────────
+  SELECT id INTO v_academy_id
+  FROM public.academies
+  WHERE is_active = TRUE
+  LIMIT 1;
+
+  -- If no active academy exists we cannot proceed; log and bail safely.
+  IF v_academy_id IS NULL THEN
+    RAISE WARNING 'handle_new_user(): no active academy found for user %', NEW.id;
+    RETURN NEW;
+  END IF;
+
+  -- ── 2. EXTRACT & NORMALISE METADATA ───────────────────────────────────────
+  v_role := COALESCE(NULLIF(TRIM(NEW.raw_user_meta_data ->> 'role'), ''), 'player');
+
+  -- Safe UUID cast: empty string → NULL (avoids "invalid input syntax for type uuid")
+  v_location_id := NULLIF(TRIM(NEW.raw_user_meta_data ->> 'location_id'), '')::UUID;
+
+  -- Safe DATE cast: empty string → NULL (avoids "invalid input syntax for type date")
+  v_dob := NULLIF(TRIM(NEW.raw_user_meta_data ->> 'dob'), '')::DATE;
+
+  -- ── 3. RESOLVE NAMES PER ROLE ─────────────────────────────────────────────
+  IF v_role = 'parent' THEN
+    -- For parents: public.users stores the guardian's name.
+    -- first_name / last_name in metadata are the CHILD's names (used for the player row).
+    v_first_name := COALESCE(NULLIF(TRIM(NEW.raw_user_meta_data ->> 'guardian_name'), ''), 'Unknown');
+    v_last_name  := '';
   ELSE
-    -- Players provide standard first and last names
-    u_first_name := NEW.raw_user_meta_data ->> 'first_name';
-    u_last_name := NEW.raw_user_meta_data ->> 'last_name';
+    -- player / coach / admin: standard first + last name
+    v_first_name := COALESCE(NULLIF(TRIM(NEW.raw_user_meta_data ->> 'first_name'), ''), 'Unknown');
+    v_last_name  := COALESCE(NULLIF(TRIM(NEW.raw_user_meta_data ->> 'last_name'),  ''), '');
   END IF;
 
-  -- 4. Insert into the public.users table
-  -- Note: The 'status' column will automatically default to 'PENDING' per your schema
+  -- ── 4. INSERT INTO public.users ───────────────────────────────────────────
   INSERT INTO public.users (id, email, first_name, last_name, mobile_number)
   VALUES (
-    NEW.id, 
-    NEW.email, 
-    u_first_name, 
-    u_last_name, 
-    NEW.raw_user_meta_data ->> 'mobile_number'
+    NEW.id,
+    NEW.email,
+    v_first_name,
+    v_last_name,
+    NULLIF(TRIM(NEW.raw_user_meta_data ->> 'mobile_number'), '')
   );
 
-  -- 5. Insert into user_academy_roles to establish permissions
+  -- ── 5. INSERT INTO public.user_academy_roles ──────────────────────────────
   INSERT INTO public.user_academy_roles (user_id, academy_id, permissions)
-  VALUES (NEW.id, academy_id_to_use, jsonb_build_array(user_role));
+  VALUES (NEW.id, v_academy_id, jsonb_build_array(v_role));
 
-  -- 6. Handle Player table creation based on role
-  IF user_role = 'player' THEN
-    -- If the user is a player, link their new user.id directly to the players table
+  -- ── 6. ROLE-SPECIFIC RECORDS ──────────────────────────────────────────────
+  IF v_role = 'player' THEN
+    -- Player self-registers: create their player profile linked to their user account.
     INSERT INTO public.players (academy_id, location_id, user_id, first_name, last_name, dob)
     VALUES (
-      academy_id_to_use, 
-      location_id_to_use, 
-      NEW.id, 
-      NEW.raw_user_meta_data ->> 'first_name', 
-      NEW.raw_user_meta_data ->> 'last_name', 
-      (NEW.raw_user_meta_data ->> 'dob')::date
+      v_academy_id,
+      v_location_id,
+      NEW.id,
+      COALESCE(NULLIF(TRIM(NEW.raw_user_meta_data ->> 'first_name'), ''), v_first_name),
+      COALESCE(NULLIF(TRIM(NEW.raw_user_meta_data ->> 'last_name'),  ''), v_last_name),
+      v_dob
     );
-    
-  ELSIF user_role = 'parent' THEN
-    -- If the user is a parent, create the child in the players table (leaving user_id null)
+
+  ELSIF v_role = 'parent' THEN
+    -- Parent registers: create the CHILD's player profile (user_id left NULL).
+    -- first_name / last_name in metadata are the child's names.
     INSERT INTO public.players (academy_id, location_id, first_name, last_name, dob)
     VALUES (
-      academy_id_to_use, 
-      location_id_to_use, 
-      NEW.raw_user_meta_data ->> 'first_name', 
-      NEW.raw_user_meta_data ->> 'last_name', 
-      (NEW.raw_user_meta_data ->> 'dob')::date
+      v_academy_id,
+      v_location_id,
+      COALESCE(NULLIF(TRIM(NEW.raw_user_meta_data ->> 'first_name'), ''), 'Unknown'),
+      COALESCE(NULLIF(TRIM(NEW.raw_user_meta_data ->> 'last_name'),  ''), ''),
+      v_dob
     )
-    RETURNING id INTO new_player_id; -- Capture the generated UUID for the child
+    RETURNING id INTO v_player_id;
 
-    -- Link the parent user to the newly created child player
+    -- Link the parent user to the child player.
     INSERT INTO public.parent_player (parent_user_id, player_id)
-    VALUES (NEW.id, new_player_id);
+    VALUES (NEW.id, v_player_id);
+
+  -- coach / admin: no player record needed; user_academy_roles entry is sufficient.
   END IF;
 
+  RETURN NEW;
+
+-- ── EXCEPTION HANDLER ───────────────────────────────────────────────────────
+-- CRITICAL: never re-raise here.
+-- An unhandled exception propagates into GoTrue's open transaction, causing it
+-- to roll back the email_confirmed_at update and then use a fallback path that
+-- skips confirmation_token entirely and auto-confirms the user — corrupting the
+-- entire confirmation flow.
+EXCEPTION WHEN OTHERS THEN
+  RAISE WARNING 'handle_new_user() error for user % (role: %): % [%]',
+    NEW.id, v_role, SQLERRM, SQLSTATE;
   RETURN NEW;
 END;
 $$;
 
--- Drop the old trigger to prevent duplicates or conflicts
+-- ── TRIGGER SETUP ─────────────────────────────────────────────────────────────
+-- Drop legacy triggers (belt-and-suspenders — covers any old AFTER INSERT variants).
+DROP TRIGGER IF EXISTS on_auth_user_created  ON auth.users;
 DROP TRIGGER IF EXISTS on_auth_user_confirmed ON auth.users;
 
--- Create the trigger to fire ONLY when confirmed_at transitions from NULL to a timestamp
+-- Fire ONLY when email_confirmed_at transitions NULL → non-NULL.
+-- GoTrue writes to email_confirmed_at (not confirmed_at, which is a generated column).
 CREATE TRIGGER on_auth_user_confirmed
-  AFTER UPDATE OF confirmed_at ON auth.users
+  AFTER UPDATE OF email_confirmed_at ON auth.users
   FOR EACH ROW
-  WHEN (OLD.confirmed_at IS NULL AND NEW.confirmed_at IS NOT NULL)
+  WHEN (OLD.email_confirmed_at IS NULL AND NEW.email_confirmed_at IS NOT NULL)
   EXECUTE FUNCTION public.handle_new_user();
 
 

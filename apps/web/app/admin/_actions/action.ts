@@ -10,10 +10,7 @@ import { requireRole } from '@/lib/dal';
 import { validateCoachData, normalizeIndianMobile } from '@/lib/validations/signup';
 import { DEFAULT_PRESET_PASSWORD } from '@/lib/constants/auth';
 
-/**
- * Generates a secure temporary password.
- * In a real-world scenario, you would email this to the user.
- */
+
 function generateTempPassword() {
   return Math.random().toString(36).slice(-8) + 'X1!';
 }
@@ -146,61 +143,35 @@ export async function addCoachAdmin(formData: FormData): Promise<{ success: fals
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
-  let authUserId: string | null = null;
-
-  if (serviceRoleKey) {
-    const supabaseAdmin = createSupabaseClient(supabaseUrl, serviceRoleKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
-
-    const { data: adminData } = await supabaseAdmin.auth.admin.createUser({
-      email,
-      password: password,
-      email_confirm: true,
-      user_metadata: {
-        isFromAdmin: true,
-        role: 'coach',
-        first_name: firstName,
-        last_name: lastName,
-        mobile_number: mobileNumber,
-        location_id: locationId,
-      },
-    });
-
-    if (adminData?.user) {
-      authUserId = adminData.user.id;
-    }
+  if (!serviceRoleKey) {
+    return { success: false, error: 'Supabase Service Role Key is missing' };
   }
 
-  if (!authUserId) {
-    const supabaseClient = createSupabaseClient(supabaseUrl, anonKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
+  const supabaseAdmin = createSupabaseClient(supabaseUrl, serviceRoleKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
 
-    const { data: signUpData, error: signUpError } = await supabaseClient.auth.signUp({
-      email,
-      password: password,
-      options: {
-        data: {
-          isFromAdmin: true,
-          role: 'coach',
-          first_name: firstName,
-          last_name: lastName,
-          mobile_number: mobileNumber,
-          location_id: locationId,
-        },
-      },
-    });
+  const { data: adminData, error: createError } = await supabaseAdmin.auth.admin.createUser({
+    email,
+    password: password,
+    email_confirm: true,
+    user_metadata: {
+      isFromAdmin: true,
+      role: 'coach',
+      first_name: firstName,
+      last_name: lastName,
+      mobile_number: mobileNumber,
+      location_id: locationId,
+    },
+  });
 
-    if (signUpError || !signUpData?.user) {
-      return { success: false, error: signUpError?.message ?? 'Unable to create auth account for coach' };
-    }
-    authUserId = signUpData.user.id;
+  if (createError || !adminData?.user) {
+    return { success: false, error: createError?.message ?? 'Unable to create auth account for coach' };
   }
 
-  // Create public.users entry with status ACTIVE
+  const authUserId = adminData.user.id;
+
   await prisma.user.upsert({
     where: { id: authUserId },
     update: {

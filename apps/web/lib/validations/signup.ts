@@ -75,7 +75,7 @@ export function validateDob(dob: string, minAgeYears = 6): ValidationResult {
   if (birthDate > minimumAllowedDate) {
     return {
       isValid: false,
-      error: `Date of birth must be at least ${minAgeYears} years old`,
+      error: `Age must be at least ${minAgeYears} years old`,
     };
   }
 
