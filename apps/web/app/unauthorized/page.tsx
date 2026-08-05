@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { signOut } from '@/app/actions';
+import { signOut } from '@/app/(auth)/_actions/auth';
 
 export default function UnauthorizedPage({
   searchParams,

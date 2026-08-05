@@ -6,7 +6,7 @@ import { UserManagementBoard } from './_components/UserManagementBoard'
 import { TopAppBar } from '@/components/layout/TopAppBar'
 import { HomeTab } from './_components/HomeTab'
 import { BottomNavBar } from './_components/BottomNavBar'
-import { signOut } from '@/app/actions'
+import { signOut } from '@/app/(auth)/_actions/auth'
 
 export default async function AdminPage({
   searchParams,

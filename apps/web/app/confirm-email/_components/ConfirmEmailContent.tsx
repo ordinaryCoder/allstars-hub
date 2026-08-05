@@ -4,7 +4,7 @@ import { AcademyLogo } from "@/components/icons";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useState, useTransition, useEffect } from "react";
 import { resendConfirmationEmail } from "../_actions/action";
-import { signOut } from "@/app/actions";
+import { signOut } from "@/app/(auth)/_actions/auth";
 
 export default function ConfirmEmailContent({ userEmail }: { userEmail?: string }) {
   const searchParams = useSearchParams();

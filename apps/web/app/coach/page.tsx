@@ -5,8 +5,8 @@ import { ACADEMY_NAME } from '@/lib/constant';
 import { TodaySessions } from './_components/TodaySessions';
 import { prisma } from '@packages/database';
 import { PerformanceTrack } from './_components/PerformanceTrack';
-import { signOut } from '@/app/actions';
-
+import { signOut } from '@/app/(auth)/_actions/auth';
+import { TopAppBar } from '@/components/layout/TopAppBar';
 import { CoachBottomNav } from '@/components/layout/CoachBottomNav';
 
 export default async function DashboardPage() {
@@ -48,7 +48,7 @@ export default async function DashboardPage() {
     <>
       <div className="bg-slate-50 text-slate-900 antialiased min-h-screen font-sans">
         <div className="max-w-[448px] mx-auto min-h-screen bg-slate-50 flex flex-col relative pb-24">
-          <TopAppBar userName={userName} onSignOut={signOut} />
+          <TopAppBar userName={userName} signOut={signOut} />
           
           <main className="flex-1 px-4 py-6 flex flex-col gap-6">
             <CreateSessionCard futureSessionsCount={futureSessionsCount} />
@@ -63,30 +63,6 @@ export default async function DashboardPage() {
 }
 
 // --- Components ---
-function TopAppBar({ userName, onSignOut }: { userName: string, onSignOut: () => void }) {
-  return ( 
-    <header className="flex justify-between items-center w-full px-4 h-16 sticky top-0 z-50 bg-white shadow-sm border-b border-slate-200">
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-100 border border-slate-200">
-          <img 
-            className="w-full h-full object-cover" 
-            alt="Coach portrait" 
-            src="https://lh3.googleusercontent.com/aida-public/AB6AXuAF_ijyJv_7kOvUm_2mE7dVIU5VzYjmYlfCnFj4wJ0wFi9OrXCGW96OWMJGISSnd3LqLy-m3a-WV2c78GfOJS9r3kR5q8M1EF8xnzHAD55ijit7B1E2gyJj_ID6QOQKXpnTbp-jgqZ8p7unZr2Ir0VXiLyNs48uDNFwOhfe91qXUg_qcCbIZ7tFNrpPVkeiekhnWP9c63hvQMO0pp2cPdUmV9Vs3xGuScsV4NKmapUG6DXehItJKloVpXNqVR9vHIdoteqF6XilE5zz"
-          />
-        </div>
-        <div className="flex flex-col">
-          <span className="font-semibold text-base text-slate-900 capitalize">{userName}</span>
-          <span className="text-[10px] text-slate-500 font-bold tracking-wider uppercase">{ACADEMY_NAME}</span>
-        </div>
-      </div>
-      <form action={onSignOut}>
-        <button type="submit" className="bg-slate-100 p-2 rounded-full text-slate-900 active:scale-95 transition-transform duration-150 hover:bg-slate-200 flex items-center justify-center">
-          <span className="material-symbols-outlined">logout</span>
-        </button>
-      </form>
-    </header>
-  );
-}
 
 function CreateSessionCard({ futureSessionsCount }: { futureSessionsCount: number }) {
   return (

@@ -7,7 +7,7 @@ import { createClient } from '@/lib/server';
 import { redirect } from 'next/navigation';
 import { requireRole } from '@/lib/dal';
 import { prisma } from '@packages/database';
-import { signOut } from '@/app/actions';
+import { signOut } from '@/app/(auth)/_actions/auth';
 
 export default async function PlayerPage() {
   const supabase = await createClient();

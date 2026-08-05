@@ -4,7 +4,7 @@ import { requireRole } from '@/lib/dal';
 import { prisma } from '@packages/database';
 import { TopAppBar } from '@/components/layout/TopAppBar';
 import { BottomNavBar } from '../../_components/BottomNavBar';
-import { signOut } from '@/app/actions';
+import { signOut } from '@/app/(auth)/_actions/auth';
 import {
   UpcomingSessionsListView,
   type UpcomingSessionItem,

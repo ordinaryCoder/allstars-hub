@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/server'
 import { prisma } from '@packages/database'
-import { signOut } from '@/app/actions'
+import { signOut } from '@/app/(auth)/_actions/auth'
 
 export default async function PendingApprovalPage({
   searchParams,

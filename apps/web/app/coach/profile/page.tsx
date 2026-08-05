@@ -2,9 +2,10 @@ import { createClient } from '@/lib/server';
 import { redirect } from 'next/navigation';
 import { requireRole } from '@/lib/dal';
 import { prisma } from '@packages/database';
-import { signOut } from '@/app/actions';
+import { signOut } from '@/app/(auth)/_actions/auth';
 import { CoachBottomNav } from '@/components/layout/CoachBottomNav';
 import { ACADEMY_NAME } from '@/lib/constant';
+import { ChangePasswordButton } from '@/components/ui/ChangePasswordButton';
 
 export default async function CoachProfilePage() {
   const supabase = await createClient();
@@ -217,6 +218,15 @@ export default async function CoachProfilePage() {
                 ))}
               </div>
             )}
+          </section>
+
+          {/* Change Password */}
+          <section className="space-y-2">
+            <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider px-1 flex items-center gap-2">
+              <span className="material-symbols-outlined text-[16px] text-slate-500">security</span>
+              Account Security
+            </h3>
+            <ChangePasswordButton />
           </section>
 
           {/* Sign Out Action */}
