@@ -16,6 +16,10 @@ export default async function AdminPage({
   const params = await searchParams
   const tab = params?.tab || 'home'
 
+  if (tab === 'create-session' || tab === 'schedule') {
+    redirect('/admin/create-session')
+  }
+
   const supabase = await createClient()
   const { data: { user }, error } = await supabase.auth.getUser()
 
