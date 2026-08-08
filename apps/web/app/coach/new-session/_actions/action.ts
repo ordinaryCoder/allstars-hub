@@ -31,12 +31,22 @@ export async function saveAttendance(payload: {
       // 1. Scheduled Session (pre-created by Admin or Scheduler with location and coach)
       const existingSession = await prisma.session.findUnique({
         where: { id: sessionId },
-        select: { id: true, academy_id: true, location_id: true, coach_id: true, created_by: true }
+        select: { id: true, academy_id: true, location_id: true, coach_id: true, created_by: true, end_time: true }
       });
       if (!existingSession) throw new Error('Scheduled session not found');
 
       const targetSessionId = existingSession.id;
       const academyId = existingSession.academy_id;
+      const now = new Date();
+
+      // If submitted within the end_time window, update end_time on spot to now
+      // Else if submitted after the session has passed end_time, do NOT update end_time
+      if (now <= existingSession.end_time) {
+        await prisma.session.update({
+          where: { id: targetSessionId },
+          data: { end_time: now },
+        });
+      }
 
       // Collect all player rows to insert
       const allPlayers: { id: string }[] = [];

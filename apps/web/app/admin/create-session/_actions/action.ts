@@ -96,8 +96,8 @@ export async function createSessionAdmin(formData: FormData): Promise<CreateSess
       };
     }
 
-    // 1 hour session duration
-    const endTime = new Date(startTime.getTime() + 60 * 60 * 1000);
+    // 3 hours session duration window for coach attendance marking
+    const endTime = new Date(startTime.getTime() + 3 * 60 * 60 * 1000);
 
     const session = await prisma.session.create({
       data: {

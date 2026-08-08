@@ -42,7 +42,12 @@ export default async function PastSessionsPage() {
   let pastSessionsList: PastSessionItem[] = [];
   try {
     const rawSessions = await prisma.session.findMany({
-      where: { start_time: { lte: now } },
+      where: {
+        OR: [
+          { start_time: { lte: now } },
+          { attendance: { some: {} } },
+        ],
+      },
       orderBy: { start_time: 'desc' },
       select: {
         id: true,
@@ -69,16 +74,19 @@ export default async function PastSessionsPage() {
       },
     });
 
+    // Preload active-player counts for every location in one query,
+    // then look them up via a Map — eliminates the N+1 pattern.
+    const locationCounts = await prisma.player.groupBy({
+      by: ['location_id'],
+      where: { is_active: true },
+      _count: { id: true },
+    });
+    const locationCountMap = new Map(
+      locationCounts.map((lc) => [lc.location_id, lc._count.id])
+    );
+
     for (const s of rawSessions) {
-      let locationTotalPlayers = 0;
-      if (s.location?.id) {
-        locationTotalPlayers = await prisma.player.count({
-          where: {
-            location_id: s.location.id,
-            is_active: true,
-          },
-        });
-      }
+      const locationTotalPlayers = locationCountMap.get(s.location?.id ?? '') ?? 0;
 
       const attendedCount = s.attendance.filter(
         (a) => a.status === 'PRESENT' || a.status === 'LATE'

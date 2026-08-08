@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation';
 import AttendanceRoster from './_components/AttendanceRoster';
 import { saveAttendance } from './_actions/action';
 
-export default async function NewSessionPage({ searchParams }: { searchParams: Promise<{ locationId?: string }> }) {
+export default async function NewSessionPage({ searchParams }: { searchParams: Promise<{ locationId?: string; sessionId?: string }> }) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -14,6 +14,7 @@ export default async function NewSessionPage({ searchParams }: { searchParams: P
   }
 
   const resolvedParams = await searchParams;
+  const sessionId = resolvedParams.sessionId || undefined;
 
   // 1. Fetch locations assigned to the coach
   const coachLocations = await prisma.coachLocation.findMany({
@@ -80,6 +81,7 @@ export default async function NewSessionPage({ searchParams }: { searchParams: P
           locations={locations}
           selectedLocationId={selectedLocationId}
           playersByLocation={playersByLocation} 
+          sessionId={sessionId}
           onSave={saveAttendance} 
         />
       </div>

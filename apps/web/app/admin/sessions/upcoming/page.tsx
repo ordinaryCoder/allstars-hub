@@ -42,7 +42,10 @@ export default async function UpcomingSessionsPage() {
   let upcomingSessionsList: UpcomingSessionItem[] = [];
   try {
     const rawSessions = await prisma.session.findMany({
-      where: { start_time: { gt: now } },
+      where: {
+        start_time: { gt: now },
+        attendance: { none: {} },
+      },
       orderBy: { start_time: 'asc' },
       select: {
         id: true,
@@ -62,16 +65,19 @@ export default async function UpcomingSessionsPage() {
       },
     });
 
+    // Preload active-player counts for every location in one query,
+    // then look them up via a Map — eliminates the N+1 pattern.
+    const locationCounts = await prisma.player.groupBy({
+      by: ['location_id'],
+      where: { is_active: true },
+      _count: { id: true },
+    });
+    const locationCountMap = new Map(
+      locationCounts.map((lc) => [lc.location_id, lc._count.id])
+    );
+
     for (const s of rawSessions) {
-      let locationTotalPlayers = 0;
-      if (s.location?.id) {
-        locationTotalPlayers = await prisma.player.count({
-          where: {
-            location_id: s.location.id,
-            is_active: true,
-          },
-        });
-      }
+      const locationTotalPlayers = locationCountMap.get(s.location?.id ?? '') ?? 0;
 
       const scheduledAtText = s.start_time.toLocaleTimeString([], {
         hour: '2-digit',

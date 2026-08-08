@@ -27,22 +27,38 @@ export default async function DashboardPage() {
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
 
+  const coachLocations = await prisma.coachLocation.findMany({
+    where: { user_id: user.id },
+    select: { location_id: true },
+  });
+  const coachLocationIds = coachLocations.map((cl) => cl.location_id);
+
   const todaySessions = await prisma.session.findMany({
     where: {
-      created_by: user.id,
       start_time: {
         gte: today,
         lt: tomorrow,
       },
+      OR: [
+        { coach_id: user.id },
+        { created_by: user.id },
+        {
+          coach_id: null,
+          location_id: { in: coachLocationIds },
+        },
+      ],
     },
     include: {
       location: true,
+      attendance: { select: { id: true } },
     },
     orderBy: { start_time: 'asc' },
   });
   
   const now = new Date();
-  const futureSessionsCount = todaySessions.filter(s => new Date(s.start_time) > now).length;
+  const futureSessionsCount = todaySessions.filter(
+    (s) => new Date(s.start_time) > now && s.attendance.length === 0
+  ).length;
 
   return (
     <>

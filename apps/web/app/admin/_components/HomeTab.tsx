@@ -208,12 +208,18 @@ export async function HomeTab() {
 
   try {
     const futureCount = await prisma.session.count({
-      where: { start_time: { gt: now } },
+      where: {
+        start_time: { gt: now },
+        attendance: { none: {} },
+      },
     });
     hasMoreUpcomingSessions = futureCount >= 2;
 
     const firstFutureSession = await prisma.session.findFirst({
-      where: { start_time: { gt: now } },
+      where: {
+        start_time: { gt: now },
+        attendance: { none: {} },
+      },
       orderBy: { start_time: 'asc' },
       select: {
         id: true,
@@ -285,12 +291,22 @@ export async function HomeTab() {
 
   try {
     const pastCount = await prisma.session.count({
-      where: { start_time: { lte: now } },
+      where: {
+        OR: [
+          { start_time: { lte: now } },
+          { attendance: { some: {} } },
+        ],
+      },
     });
     hasMorePastSessions = pastCount >= 2;
 
     const pastSession = await prisma.session.findFirst({
-      where: { start_time: { lte: now } },
+      where: {
+        OR: [
+          { start_time: { lte: now } },
+          { attendance: { some: {} } },
+        ],
+      },
       orderBy: { start_time: 'desc' },
       select: {
         id: true,

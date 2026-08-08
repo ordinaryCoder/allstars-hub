@@ -72,6 +72,7 @@ export default async function PlayerPage() {
   const nextSession = player ? await prisma.session.findFirst({
     where: {
       start_time: { gt: new Date() },
+      attendance: { none: {} },
       location_id: player.location_id,
       batches: {
         some: {

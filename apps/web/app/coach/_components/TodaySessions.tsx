@@ -1,12 +1,16 @@
+import Link from 'next/link';
+
 export interface SessionLocation {
   name: string;
 }
 
 export interface Session {
   id: string;
+  location_id?: string | null;
   start_time: Date;
   end_time: Date;
   location?: SessionLocation | null;
+  attendance?: { id: string }[] | null;
 }
 
 export function TodaySessions({ sessions }: { sessions: Session[] }) {
@@ -24,9 +28,10 @@ export function TodaySessions({ sessions }: { sessions: Session[] }) {
           </div>
         ) : (
           sessions.map((session) => {
-            const isCompleted = now > session.end_time;
-            const isActive = now >= session.start_time && now <= session.end_time;
-            const statusLabel = isActive ? 'ACTIVE' : isCompleted ? 'COMPLETED' : 'UPCOMING';
+            const hasAttendance = Array.isArray(session.attendance) && session.attendance.length > 0;
+            const isCompleted = now > session.end_time || hasAttendance;
+            const isActive = !isCompleted && now >= session.start_time && now <= session.end_time;
+            const statusLabel = hasAttendance ? 'COMPLETED' : isActive ? 'ACTIVE' : isCompleted ? 'COMPLETED' : 'UPCOMING';
             const locationTitle = session.location?.name || 'Unassigned Location';
 
             const timeString = new Intl.DateTimeFormat('en-US', {
@@ -56,9 +61,12 @@ export function TodaySessions({ sessions }: { sessions: Session[] }) {
                   <>
                     <div className="h-[1px] bg-slate-50 w-full"></div>
                     <div className="flex justify-between items-center">
-                      <button className="bg-slate-900 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-slate-800 active:scale-95 transition-all w-full">
-                        {isActive ? 'Resume Session' : 'Start Session'}
-                      </button>
+                      <Link
+                        href={`/coach/new-session?sessionId=${session.id}${session.location_id ? `&locationId=${session.location_id}` : ''}`}
+                        className="bg-slate-900 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-slate-800 active:scale-95 transition-all w-full text-center block"
+                      >
+                        Mark Attendance
+                      </Link>
                     </div>
                   </>
                 )}

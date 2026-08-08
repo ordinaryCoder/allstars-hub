@@ -12,11 +12,13 @@ export default function AttendanceRoster({
   locations = [], 
   selectedLocationId = '', 
   playersByLocation, 
+  sessionId,
   onSave 
 }: { 
   locations?: LocationBrief[];
   selectedLocationId?: string;
   playersByLocation?: PlayersByLocation[]; 
+  sessionId?: string;
   onSave?: (payload: any) => Promise<any>;
 }) {
   const [query, setQuery] = useState('');
@@ -229,12 +231,12 @@ export default function AttendanceRoster({
             try {
               setSaving(true);
               if (onSave) {
-                await onSave({ attendance, playersByLocation });
+                await onSave({ attendance, playersByLocation, sessionId });
               } else {
                 const res = await fetch('/coach/new-session', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ attendance, playersByLocation }),
+                  body: JSON.stringify({ attendance, playersByLocation, sessionId }),
                 });
                 if (!res.ok) {
                   const text = await res.text();
