@@ -64,8 +64,46 @@ export async function getUsersByCategory(category: 'players' | 'coaches' | 'pend
     });
   }
 
-  const activeUsers = await prisma.user.findMany({
-    where: { status: 'ACTIVE' },
+  if (category === 'players') {
+    return await prisma.user.findMany({
+      where: {
+        status: 'ACTIVE',
+        academy_roles: {
+          some: {
+            OR: [
+              { permissions: { array_contains: 'player' } },
+              { permissions: { array_contains: 'parent' } },
+            ],
+          },
+        },
+      },
+      select: {
+        id: true,
+        first_name: true,
+        last_name: true,
+        email: true,
+        mobile_number: true,
+        status: true,
+        created_at: true,
+        academy_roles: { select: { permissions: true } },
+      },
+      orderBy: { created_at: 'desc' },
+    });
+  }
+
+  // Coaches / Admins
+  return await prisma.user.findMany({
+    where: {
+      status: 'ACTIVE',
+      academy_roles: {
+        some: {
+          OR: [
+            { permissions: { array_contains: 'coach' } },
+            { permissions: { array_contains: 'admin' } },
+          ],
+        },
+      },
+    },
     select: {
       id: true,
       first_name: true,
@@ -77,23 +115,6 @@ export async function getUsersByCategory(category: 'players' | 'coaches' | 'pend
       academy_roles: { select: { permissions: true } },
     },
     orderBy: { created_at: 'desc' },
-  });
-
-  if (category === 'players') {
-    return activeUsers.filter((u) => {
-      const perms = u.academy_roles?.[0]?.permissions;
-      if (!perms) return false;
-      const permStr = Array.isArray(perms) ? perms.join(',').toLowerCase() : String(perms).toLowerCase();
-      return permStr.includes('parent') || permStr.includes('player');
-    });
-  }
-
-  // Coaches / Admins
-  return activeUsers.filter((u) => {
-    const perms = u.academy_roles?.[0]?.permissions;
-    if (!perms) return false;
-    const permStr = Array.isArray(perms) ? perms.join(',').toLowerCase() : String(perms).toLowerCase();
-    return !permStr.includes('parent') && !permStr.includes('player');
   });
 }
 
@@ -190,9 +211,10 @@ export async function addCoachAdmin(formData: FormData): Promise<{ success: fals
     },
   });
 
-  // Assign coach role
+  // Assign coach role — use composite unique key (user_id, academy_id)
+  // so re-adding an existing coach updates permissions rather than inserting a duplicate row.
   await prisma.userAcademyRole.upsert({
-    where: { id: authUserId },
+    where: { user_id_academy_id: { user_id: authUserId, academy_id: academy.id } },
     update: { permissions: ['coach'] },
     create: {
       user_id: authUserId,

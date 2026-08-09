@@ -47,6 +47,7 @@ export default async function UpcomingSessionsPage() {
         attendance: { none: {} },
       },
       orderBy: { start_time: 'asc' },
+      take: 50,
       select: {
         id: true,
         start_time: true,

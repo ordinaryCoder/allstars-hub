@@ -31,9 +31,9 @@ export function CalendarWidget({ monthName, attendanceMap }: { monthName: string
         {pastDates.map((d, i) => <div key={`p-${i}`} className="h-9 flex items-center justify-center opacity-25 text-sm">{d}</div>)}
         {currentDates.map((d) => {
           const status = attendanceMap[d];
-          if (status === 'Absent') return <div key={d} className="h-9 w-9 mx-auto flex items-center justify-center font-bold text-white bg-rose-500 rounded-full shadow-sm">{d}</div>;
-          if (status === 'Present') return <div key={d} className="h-9 w-9 mx-auto flex items-center justify-center font-bold text-white bg-emerald-500 rounded-full shadow-sm">{d}</div>;
-          if (status === 'Late') return <div key={d} className="h-9 w-9 mx-auto flex items-center justify-center font-bold text-white bg-amber-500 rounded-full shadow-sm">{d}</div>;
+          if (status === 'ABSENT') return <div key={d} className="h-9 w-9 mx-auto flex items-center justify-center font-bold text-white bg-rose-500 rounded-full shadow-sm">{d}</div>;
+          if (status === 'PRESENT') return <div key={d} className="h-9 w-9 mx-auto flex items-center justify-center font-bold text-white bg-emerald-500 rounded-full shadow-sm">{d}</div>;
+          if (status === 'LATE') return <div key={d} className="h-9 w-9 mx-auto flex items-center justify-center font-bold text-white bg-amber-500 rounded-full shadow-sm">{d}</div>;
           return <div key={d} className="h-9 flex items-center justify-center text-sm">{d}</div>;
         })}
         {futureDates.map((d, i) => <div key={`f-${i}`} className="h-9 flex items-center justify-center opacity-25 text-sm">{d}</div>)}

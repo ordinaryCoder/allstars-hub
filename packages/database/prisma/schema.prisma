@@ -58,6 +58,9 @@ model UserAcademyRole {
   user    User    @relation(fields: [user_id], references: [id])
   academy Academy @relation(fields: [academy_id], references: [id])
 
+  @@unique([user_id, academy_id]) // prevents duplicate role rows per user per academy
+  @@index([user_id])              // token hook + RLS lookup
+  @@index([academy_id])           // admin user listing
   @@map("user_academy_roles")
 }
 
@@ -109,7 +112,7 @@ model Batch {
 model Player {
   id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   academy_id  String   @db.Uuid
-  location_id String   @db.Uuid // NEW: Player's primary or registered branch
+  location_id String   @db.Uuid // Player's primary or registered branch
   user_id     String?  @db.Uuid // Nullable for self-login
   first_name  String
   last_name   String
@@ -117,11 +120,14 @@ model Player {
   is_active   Boolean  @default(true)
 
   academy    Academy        @relation(fields: [academy_id], references: [id])
-  location   Location       @relation(fields: [location_id], references: [id]) // NEW
+  location   Location       @relation(fields: [location_id], references: [id])
   batches    PlayerBatch[]
   attendance Attendance[]
   parents    ParentPlayer[]
 
+  @@index([location_id, is_active]) // coach player list + RLS location filter
+  @@index([academy_id])             // RLS tenant isolation check
+  @@index([user_id])                // self-view RLS condition
   @@map("players")
 }
 
@@ -143,6 +149,10 @@ model Session {
   batches    SessionBatch[]
   attendance Attendance[]
 
+  @@index([academy_id, start_time(sort: Desc)]) // dashboard + admin session list (most common filter)
+  @@index([coach_id])                           // coach dashboard filter + RLS visibility
+  @@index([location_id])                        // RLS location-based access
+  @@index([created_by])                         // spontaneous session queries
   @@map("sessions")
 }
 
@@ -188,6 +198,11 @@ model Attendance {
   player  Player  @relation(fields: [player_id], references: [id])
   marker  User    @relation("MarkedBy", fields: [marked_by], references: [id])
 
+  @@unique([session_id, player_id])    // prevents duplicate attendance on retry/double-submit
+  @@index([session_id])                // every attendance lookup by session
+  @@index([player_id])                 // player attendance history
+  @@index([academy_id])                // RLS tenant isolation
+  @@index([session_id, status])        // report page aggregation (present/late counts)
   @@map("attendance")
 }
 
@@ -199,6 +214,8 @@ model ParentPlayer {
   player Player @relation(fields: [player_id], references: [id])
 
   @@id([parent_user_id, player_id])
+  @@index([parent_user_id]) // parent self-view RLS + parent_player lookups
+  @@index([player_id])      // player → parent resolution
   @@map("parent_player")
 }
 
@@ -210,6 +227,7 @@ model Goal {
 
   session Session @relation(fields: [session_id], references: [id])
 
+  @@index([session_id]) // goals lookup per session + RLS check
   @@map("goals")
 }
 

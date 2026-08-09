@@ -20,19 +20,19 @@ export async function HomeTab() {
   // Fallback to active parent/player users if player table count is 0
   if (totalPlayers === 0) {
     try {
-      const allActiveUsers = await prisma.user.findMany({
-        where: { status: 'ACTIVE' },
-        select: {
-          academy_roles: { select: { permissions: true } },
+      totalPlayers = await prisma.user.count({
+        where: {
+          status: 'ACTIVE',
+          academy_roles: {
+            some: {
+              OR: [
+                { permissions: { array_contains: 'player' } },
+                { permissions: { array_contains: 'parent' } },
+              ],
+            },
+          },
         },
       });
-
-      totalPlayers = allActiveUsers.filter((user) => {
-        const perms = user.academy_roles?.[0]?.permissions;
-        if (!perms) return false;
-        const permStr = Array.isArray(perms) ? perms.join(',').toLowerCase() : String(perms).toLowerCase();
-        return permStr.includes('parent') || permStr.includes('player');
-      }).length;
     } catch (e) {
       console.error("User fallback count failed", e);
     }
@@ -134,8 +134,10 @@ export async function HomeTab() {
       select: {
         id: true,
         location_id: true,
+        _count: { select: { attendance: true } },
         attendance: {
-          select: { status: true },
+          where: { status: { in: ['PRESENT', 'LATE'] } },
+          select: { id: true },
         },
       },
     });
@@ -145,15 +147,14 @@ export async function HomeTab() {
       let evaluatedSessions = 0;
 
       for (const sess of monthlySessions) {
-        if (sess.attendance.length > 0) {
-          const attended = sess.attendance.filter(
-            (a) => a.status === 'PRESENT' || a.status === 'LATE'
-          ).length;
+        const totalMarked = sess._count.attendance;
+        if (totalMarked > 0) {
+          const attended = sess.attendance.length;
           let locationPlayers = 0;
           if (sess.location_id) {
             locationPlayers = locationPlayerCounts[sess.location_id] || 0;
           }
-          const denominator = Math.max(locationPlayers, sess.attendance.length);
+          const denominator = Math.max(locationPlayers, totalMarked);
           if (denominator > 0) {
             totalPercentSum += Math.round((attended / denominator) * 100);
             evaluatedSessions++;

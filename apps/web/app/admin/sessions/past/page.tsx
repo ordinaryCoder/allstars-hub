@@ -49,6 +49,7 @@ export default async function PastSessionsPage() {
         ],
       },
       orderBy: { start_time: 'desc' },
+      take: 50,
       select: {
         id: true,
         start_time: true,

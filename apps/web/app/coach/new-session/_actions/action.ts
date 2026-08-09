@@ -39,15 +39,6 @@ export async function saveAttendance(payload: {
       const academyId = existingSession.academy_id;
       const now = new Date();
 
-      // If submitted within the end_time window, update end_time on spot to now
-      // Else if submitted after the session has passed end_time, do NOT update end_time
-      if (now <= existingSession.end_time) {
-        await prisma.session.update({
-          where: { id: targetSessionId },
-          data: { end_time: now },
-        });
-      }
-
       // Collect all player rows to insert
       const allPlayers: { id: string }[] = [];
       if (playersByLocation) {
@@ -72,9 +63,18 @@ export async function saveAttendance(payload: {
         };
       });
 
-      if (rows.length > 0) {
-        await prisma.attendance.createMany({ data: rows });
-      }
+      await prisma.$transaction(async (tx) => {
+        if (now <= existingSession.end_time) {
+          await tx.session.update({
+            where: { id: targetSessionId },
+            data: { end_time: now },
+          });
+        }
+
+        if (rows.length > 0) {
+          await tx.attendance.createMany({ data: rows, skipDuplicates: true });
+        }
+      });
 
       return { ok: true, sessionId: targetSessionId };
     } else {
@@ -171,7 +171,7 @@ export async function saveAttendance(payload: {
         });
 
         if (rows.length > 0) {
-          await tx.attendance.createMany({ data: rows });
+          await tx.attendance.createMany({ data: rows, skipDuplicates: true });
         }
 
         return { ok: true, sessionId: newSession.id };

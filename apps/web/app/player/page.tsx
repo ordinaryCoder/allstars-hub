@@ -1,6 +1,6 @@
 import { TopAppBar } from '@/components/layout/TopAppBar';
 import { NextCoachingSession } from './_components/NextCoachingSession';
-import { AttendanceHealth } from './_components/AttendanceHealth';
+import { AttendanceStats } from './_components/AttendanceStats';
 import { CalendarWidget } from './_components/CalendarWidget';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { createClient } from '@/lib/server';
@@ -49,9 +49,9 @@ export default async function PlayerPage() {
 
   if (player?.attendance) {
     player.attendance.forEach((att: any) => {
-      if (att.status === 'Present') attended++;
-      else if (att.status === 'Absent') missed++;
-      else if (att.status === 'Late') late++;
+      if (att.status === 'PRESENT') attended++;
+      else if (att.status === 'ABSENT') missed++;
+      else if (att.status === 'LATE') late++;
 
       const date = new Date(att.session.start_time);
       if (date.getMonth() === currentMonth && date.getFullYear() === currentYear) {
@@ -60,7 +60,7 @@ export default async function PlayerPage() {
     });
   }
 
-  const attendanceHealth = {
+  const attendanceStats = {
     percentage: total > 0 ? Math.round(((attended + late) / total) * 100) : 0,
     attended: attended + late,
     missed,
@@ -102,7 +102,7 @@ export default async function PlayerPage() {
           
           <main className="flex-1 px-4 py-6 flex flex-col gap-6">
             <NextCoachingSession session={nextSession} />
-            <AttendanceHealth stats={attendanceHealth} />
+            <AttendanceStats stats={attendanceStats} />
             <CalendarWidget monthName={monthName} attendanceMap={attendanceMap} />
           </main>
 

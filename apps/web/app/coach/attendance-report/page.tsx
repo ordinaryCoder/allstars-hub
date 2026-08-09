@@ -61,8 +61,14 @@ export default async function AttendanceReportPage() {
       ],
       start_time: { gte: thirtyDaysAgo },
     },
-    include: {
-      attendance: true,
+    select: {
+      start_time: true,
+      attendance: {
+        select: {
+          player_id: true,
+          status: true,
+        },
+      },
     },
   });
 
@@ -114,11 +120,16 @@ export default async function AttendanceReportPage() {
         { created_by: user.id },
       ],
     },
-    include: {
-      location: true,
+    select: {
+      id: true,
+      start_time: true,
+      location: { select: { name: true } },
+      _count: { select: { attendance: true } },
       attendance: {
-        include: {
-          player: true,
+        select: {
+          player_id: true,
+          status: true,
+          player: { select: { first_name: true, last_name: true } },
         },
       },
     },
@@ -141,7 +152,7 @@ export default async function AttendanceReportPage() {
     const sessionPresent = session.attendance.filter(
       (a) => a.status === 'PRESENT' || a.status === 'LATE'
     ).length;
-    const sessionTotal = session.attendance.length;
+    const sessionTotal = session._count.attendance;
     const sessionRate = sessionTotal > 0 ? Math.round((sessionPresent / sessionTotal) * 100) : 0;
     const sessionTitle = session.location?.name ? `${session.location.name} Session` : 'General Session';
 
