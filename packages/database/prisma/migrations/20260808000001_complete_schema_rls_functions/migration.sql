@@ -199,7 +199,8 @@ ALTER TABLE "batches"
 
 ALTER TABLE "players"
     ADD CONSTRAINT "players_academy_id_fkey"  FOREIGN KEY ("academy_id")  REFERENCES "academies"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
-    ADD CONSTRAINT "players_location_id_fkey" FOREIGN KEY ("location_id") REFERENCES "locations"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+    ADD CONSTRAINT "players_location_id_fkey" FOREIGN KEY ("location_id") REFERENCES "locations"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    ADD CONSTRAINT "players_user_id_fkey"     FOREIGN KEY ("user_id")     REFERENCES "users"("id")     ON DELETE SET NULL  ON UPDATE CASCADE;
 
 ALTER TABLE "sessions"
     ADD CONSTRAINT "sessions_academy_id_fkey"  FOREIGN KEY ("academy_id")  REFERENCES "academies"("id") ON DELETE RESTRICT ON UPDATE CASCADE,

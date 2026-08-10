@@ -1,5 +1,3 @@
-import { createClient } from '@/lib/server';
-import { redirect } from 'next/navigation';
 import { requireRole } from '@/lib/dal';
 import { prisma } from '@packages/database';
 import { TopAppBar } from '@/components/layout/TopAppBar';
@@ -8,22 +6,31 @@ import { signOut } from '@/app/(auth)/_actions/auth';
 import { CreateSessionForm, type LocationItem, type CoachItem } from './_components/CreateSessionForm';
 
 export default async function CreateSessionPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
+  const user = await requireRole('admin');
 
-  if (error || !user) {
-    redirect('/login');
-  }
-
-  await requireRole(user.id, 'admin');
-
-  const dbUser = await prisma.user.findUnique({
-    where: { id: user.id },
-    select: { first_name: true, last_name: true },
-  });
+  const [dbUser, rawLocations, activeUsers] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: user.id },
+      select: { first_name: true, last_name: true },
+    }),
+    prisma.location.findMany({
+      where: { academy: { is_active: true } },
+      select: { id: true, name: true, address: true },
+      orderBy: { name: 'asc' },
+    }),
+    prisma.user.findMany({
+      where: { status: 'ACTIVE' },
+      select: {
+        id: true,
+        first_name: true,
+        last_name: true,
+        email: true,
+        academy_roles: { select: { permissions: true } },
+        coachLocations: { select: { location: { select: { name: true } } } },
+      },
+      orderBy: { first_name: 'asc' },
+    }),
+  ]);
 
   const adminName = dbUser
     ? `${dbUser.first_name} ${dbUser.last_name}`.trim()
@@ -33,32 +40,11 @@ export default async function CreateSessionPage() {
     ? `${dbUser.first_name?.[0] || ''}${dbUser.last_name?.[0] || ''}`.toUpperCase() || 'A'
     : (user.email?.[0] || 'A').toUpperCase();
 
-  // 1. Fetch active locations
-  const rawLocations = await prisma.location.findMany({
-    where: { academy: { is_active: true } },
-    select: { id: true, name: true, address: true },
-    orderBy: { name: 'asc' },
-  });
-
   const locations: LocationItem[] = rawLocations.map((l) => ({
     id: l.id,
     name: l.name,
     address: l.address,
   }));
-
-  // 2. Fetch active coaches in the academy
-  const activeUsers = await prisma.user.findMany({
-    where: { status: 'ACTIVE' },
-    select: {
-      id: true,
-      first_name: true,
-      last_name: true,
-      email: true,
-      academy_roles: { select: { permissions: true } },
-      coachLocations: { select: { location: { select: { name: true } } } },
-    },
-    orderBy: { first_name: 'asc' },
-  });
 
   const coaches: CoachItem[] = activeUsers
     .filter((u) => {

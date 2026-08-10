@@ -1,24 +1,12 @@
-import { createClient } from '../../lib/server';
-import { redirect } from 'next/navigation';
-import { requireRole } from '../../lib/dal';
-import { ACADEMY_NAME } from '@/lib/constant';
+import { requireRole } from '@/lib/dal';
 import { TodaySessions } from './_components/TodaySessions';
 import { prisma } from '@packages/database';
-import { PerformanceTrack } from './_components/PerformanceTrack';
 import { signOut } from '@/app/(auth)/_actions/auth';
 import { TopAppBar } from '@/components/layout/TopAppBar';
 import { CoachBottomNav } from '@/components/layout/CoachBottomNav';
 
 export default async function DashboardPage() {
-  const supabase = await createClient();
-  const { data: { user }, error } = await supabase.auth.getUser();
-
-  // TODO: cleanup logic
-  if (error || !user) {
-    redirect('/login');
-  }
-
-  await requireRole(user.id, 'coach');
+  const user = await requireRole('coach');
 
   const userName = user.email?.split('@')[0] || 'Coach';
 
@@ -26,12 +14,6 @@ export default async function DashboardPage() {
   today.setHours(0, 0, 0, 0);
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
-
-  const coachLocations = await prisma.coachLocation.findMany({
-    where: { user_id: user.id },
-    select: { location_id: true },
-  });
-  const coachLocationIds = coachLocations.map((cl) => cl.location_id);
 
   const todaySessions = await prisma.session.findMany({
     where: {
@@ -44,7 +26,11 @@ export default async function DashboardPage() {
         { created_by: user.id },
         {
           coach_id: null,
-          location_id: { in: coachLocationIds },
+          location: {
+            coachLocations: {
+              some: { user_id: user.id },
+            },
+          },
         },
       ],
     },

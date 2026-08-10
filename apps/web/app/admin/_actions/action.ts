@@ -1,7 +1,7 @@
 'use server';
 
 import { prisma } from '@packages/database';
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag } from 'next/cache';
 import { signup } from '@/app/(auth)/signup/_actions/action';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '@/lib/server';
@@ -35,9 +35,98 @@ export async function approveUser(formData: FormData): Promise<void> {
 }
 
 /**
- * Single authoritative query function for fetching users by category ('players' | 'coaches' | 'pending').
+ * Fetches location filter options for admin user management filtering.
  */
-export async function getUsersByCategory(category: 'players' | 'coaches' | 'pending') {
+export async function getFilterOptionsAdmin() {
+  await requireRole('admin');
+
+  const rawLocations = await prisma.location.findMany({
+    select: { id: true, name: true },
+    orderBy: { name: 'asc' },
+  });
+
+  const locations = rawLocations.map((l) => ({ id: l.id, name: l.name }));
+
+  return { locations };
+}
+
+function mapUserWithLocationInfos<T extends Record<string, any>>(u: T) {
+  const locationInfosSet = new Map<string, { locationId: string; locationName: string }>();
+
+  u.players?.forEach((p: any) => {
+    if (p.location) {
+      locationInfosSet.set(p.location.id, {
+        locationId: p.location.id,
+        locationName: p.location.name,
+      });
+    }
+  });
+
+  u.parent_of?.forEach((po: any) => {
+    if (po.player?.location) {
+      locationInfosSet.set(po.player.location.id, {
+        locationId: po.player.location.id,
+        locationName: po.player.location.name,
+      });
+    }
+  });
+
+  return {
+    id: u.id,
+    first_name: u.first_name,
+    last_name: u.last_name,
+    email: u.email,
+    mobile_number: u.mobile_number,
+    status: u.status,
+    created_at: u.created_at,
+    academy_roles: u.academy_roles,
+    locationInfos: Array.from(locationInfosSet.values()),
+  };
+}
+
+const playerUserSelect = {
+  id: true,
+  first_name: true,
+  last_name: true,
+  email: true,
+  mobile_number: true,
+  status: true,
+  created_at: true,
+  academy_roles: { select: { permissions: true } },
+  players: {
+    select: {
+      id: true,
+      location_id: true,
+      location: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+    },
+  },
+  parent_of: {
+    select: {
+      player: {
+        select: {
+          id: true,
+          location_id: true,
+          location: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      },
+    },
+  },
+} as const;
+
+/**
+ * Single authoritative query function for fetching users by category ('players' | 'coaches' | 'pending' | 'inactive').
+ */
+export async function getUsersByCategory(category: 'players' | 'coaches' | 'pending' | 'inactive') {
   const supabase = await createClient();
   const { data: { user }, error } = await supabase.auth.getUser();
 
@@ -64,10 +153,60 @@ export async function getUsersByCategory(category: 'players' | 'coaches' | 'pend
     });
   }
 
+  if (category === 'inactive') {
+    const inactivePlayerRecords = await prisma.player.findMany({
+      where: { is_active: false },
+      select: {
+        user_id: true,
+        parents: { select: { parent_user_id: true } },
+      },
+    });
+
+    const inactiveUserIdsSet = new Set<string>();
+    inactivePlayerRecords.forEach((p) => {
+      if (p.user_id) inactiveUserIdsSet.add(p.user_id);
+      p.parents.forEach((pp) => {
+        if (pp.parent_user_id) inactiveUserIdsSet.add(pp.parent_user_id);
+      });
+    });
+
+    if (inactiveUserIdsSet.size === 0) {
+      return [];
+    }
+
+    const users = await prisma.user.findMany({
+      where: {
+        id: { in: Array.from(inactiveUserIdsSet) },
+        status: 'ACTIVE',
+      },
+      select: playerUserSelect,
+      orderBy: { created_at: 'desc' },
+    });
+
+    return users.map(mapUserWithLocationInfos);
+  }
+
   if (category === 'players') {
-    return await prisma.user.findMany({
+    const inactivePlayerRecords = await prisma.player.findMany({
+      where: { is_active: false },
+      select: {
+        user_id: true,
+        parents: { select: { parent_user_id: true } },
+      },
+    });
+
+    const inactiveUserIdsSet = new Set<string>();
+    inactivePlayerRecords.forEach((p) => {
+      if (p.user_id) inactiveUserIdsSet.add(p.user_id);
+      p.parents.forEach((pp) => {
+        if (pp.parent_user_id) inactiveUserIdsSet.add(pp.parent_user_id);
+      });
+    });
+
+    const users = await prisma.user.findMany({
       where: {
         status: 'ACTIVE',
+        ...(inactiveUserIdsSet.size > 0 ? { id: { notIn: Array.from(inactiveUserIdsSet) } } : {}),
         academy_roles: {
           some: {
             OR: [
@@ -77,18 +216,11 @@ export async function getUsersByCategory(category: 'players' | 'coaches' | 'pend
           },
         },
       },
-      select: {
-        id: true,
-        first_name: true,
-        last_name: true,
-        email: true,
-        mobile_number: true,
-        status: true,
-        created_at: true,
-        academy_roles: { select: { permissions: true } },
-      },
+      select: playerUserSelect,
       orderBy: { created_at: 'desc' },
     });
+
+    return users.map(mapUserWithLocationInfos);
   }
 
   // Coaches / Admins
@@ -98,7 +230,7 @@ export async function getUsersByCategory(category: 'players' | 'coaches' | 'pend
       academy_roles: {
         some: {
           OR: [
-            { permissions: { array_contains: 'coach' } },
+            { permissions: { array_contains: 'coach' }, },
             { permissions: { array_contains: 'admin' } },
           ],
         },
@@ -118,6 +250,74 @@ export async function getUsersByCategory(category: 'players' | 'coaches' | 'pend
   });
 }
 
+/**
+ * Deactivates a player (Admin only). Only sets linked player record is_active to false so user status remains ACTIVE and user can log in.
+ */
+export async function deactivatePlayer(userId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    await requireRole('admin');
+
+    if (!userId) {
+      return { success: false, error: 'User ID is required' };
+    }
+
+    await prisma.player.updateMany({
+      where: {
+        OR: [
+          { user_id: userId },
+          { parents: { some: { parent_user_id: userId } } },
+        ],
+      },
+      data: { is_active: false },
+    });
+
+    revalidatePath('/admin');
+    revalidatePath('/coach/player-list');
+    revalidatePath('/coach/new-session');
+    revalidatePath('/coach/attendance-report');
+    revalidateTag('player-counts', 'default');
+
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error deactivating player:', error);
+    return { success: false, error: error?.message || 'Failed to deactivate player' };
+  }
+}
+
+/**
+ * Reactivates an inactive player (Admin only). Sets linked player record is_active to true.
+ */
+export async function reactivatePlayer(userId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    await requireRole('admin');
+
+    if (!userId) {
+      return { success: false, error: 'User ID is required' };
+    }
+
+    await prisma.player.updateMany({
+      where: {
+        OR: [
+          { user_id: userId },
+          { parents: { some: { parent_user_id: userId } } },
+        ],
+      },
+      data: { is_active: true },
+    });
+
+    revalidatePath('/admin');
+    revalidatePath('/coach/player-list');
+    revalidatePath('/coach/new-session');
+    revalidatePath('/coach/attendance-report');
+    revalidateTag('player-counts', 'default');
+
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error reactivating player:', error);
+    return { success: false, error: error?.message || 'Failed to reactivate player' };
+  }
+}
+
 
 export async function addPlayerAdmin(formData: FormData): Promise<{ success: false; error: string } | { success: true; email: string; passwordUsed: string }> {
   await requireRole('admin');
@@ -125,6 +325,7 @@ export async function addPlayerAdmin(formData: FormData): Promise<{ success: fal
   const res = await signup(formData);
   if (!res.success) return { success: false, error: res.error };
   revalidatePath('/admin');
+  revalidateTag('player-counts', 'default');
   return { success: true, email: res.email, passwordUsed: res.passwordUsed || DEFAULT_PRESET_PASSWORD };
 }
 
@@ -211,17 +412,25 @@ export async function addCoachAdmin(formData: FormData): Promise<{ success: fals
     },
   });
 
-  // Assign coach role — use composite unique key (user_id, academy_id)
-  // so re-adding an existing coach updates permissions rather than inserting a duplicate row.
-  await prisma.userAcademyRole.upsert({
-    where: { user_id_academy_id: { user_id: authUserId, academy_id: academy.id } },
-    update: { permissions: ['coach'] },
-    create: {
-      user_id: authUserId,
-      academy_id: academy.id,
-      permissions: ['coach'],
-    },
+  // Assign coach role — check existing role by (user_id, academy_id) first
+  const existingRole = await prisma.userAcademyRole.findFirst({
+    where: { user_id: authUserId, academy_id: academy.id },
   });
+
+  if (existingRole) {
+    await prisma.userAcademyRole.update({
+      where: { id: existingRole.id },
+      data: { permissions: ['coach'] },
+    });
+  } else {
+    await prisma.userAcademyRole.create({
+      data: {
+        user_id: authUserId,
+        academy_id: academy.id,
+        permissions: ['coach'],
+      },
+    });
+  }
 
   // Assign coach location
   await prisma.coachLocation.upsert({
@@ -239,5 +448,7 @@ export async function addCoachAdmin(formData: FormData): Promise<{ success: fals
   });
 
   revalidatePath('/admin');
+  revalidateTag('locations', 'default');
+  revalidateTag('player-counts', 'default');
   return { success: true, email, passwordUsed: password };
 }

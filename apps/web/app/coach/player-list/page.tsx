@@ -1,50 +1,41 @@
-import { createClient } from '@/lib/server';
-import { redirect } from 'next/navigation';
 import { requireRole } from '@/lib/dal';
 import { prisma } from '@packages/database';
 import { CoachBottomNav } from '@/components/layout/CoachBottomNav';
 import { PlayerListBoard, SerializedPlayer, SerializedLocation } from './_components/PlayerListBoard';
 
 export default async function CoachPlayersListPage() {
-  const supabase = await createClient();
-  const { data: { user }, error } = await supabase.auth.getUser();
+  const user = await requireRole('coach');
 
-  if (error || !user) {
-    redirect('/login');
-  }
-
-  await requireRole(user.id, 'coach');
-
-  // Fetch coach's assigned locations
-  const coachLocations = await prisma.coachLocation.findMany({
-    where: { user_id: user.id },
-    include: { location: true },
-  });
+  // Fetch coach's assigned locations and players in parallel
+  const [coachLocations, rawPlayers] = await Promise.all([
+    prisma.coachLocation.findMany({
+      where: { user_id: user.id },
+      include: { location: true },
+    }),
+    prisma.player.findMany({
+      where: {
+        location: {
+          coachLocations: { some: { user_id: user.id } },
+        },
+      },
+      include: {
+        location: true,
+        parents: {
+          include: { parent: true },
+        },
+      },
+      orderBy: [
+        { location: { name: 'asc' } },
+        { first_name: 'asc' },
+      ],
+    }),
+  ]);
 
   const locations: SerializedLocation[] = coachLocations.map(cl => ({
     id: cl.location.id,
     name: cl.location.name,
     address: cl.location.address,
   }));
-
-  // Fetch all players for the locations the coach has access to (no batch query for Phase 1)
-  const rawPlayers = await prisma.player.findMany({
-    where: {
-      location: {
-        coachLocations: { some: { user_id: user.id } },
-      },
-    },
-    include: {
-      location: true,
-      parents: {
-        include: { parent: true },
-      },
-    },
-    orderBy: [
-      { location: { name: 'asc' } },
-      { first_name: 'asc' },
-    ],
-  });
 
   const players: SerializedPlayer[] = rawPlayers.map((p) => {
     let age: number | null = null;

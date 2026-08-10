@@ -9,7 +9,7 @@ type Role = string | string[];
  * Verifies identity server-side via Supabase `getSession()` and validates user roles
  * from the JWT access token custom claims without making additional DB or API network calls.
  */
-export async function requireRole(userIdOrRole: string | Role, requiredRole?: Role): Promise<void> {
+export async function requireRole(userIdOrRole: string | Role, requiredRole?: Role) {
   let userId: string | undefined;
   let targetRole: Role;
 
@@ -23,7 +23,7 @@ export async function requireRole(userIdOrRole: string | Role, requiredRole?: Ro
   const supabase = await createClient();
   const { data: { session } } = await supabase.auth.getSession();
 
-  if (!session) {
+  if (!session || !session.user) {
     redirect('/login');
   }
 
@@ -50,4 +50,6 @@ export async function requireRole(userIdOrRole: string | Role, requiredRole?: Ro
   if (!hasRole) {
     redirect('/unauthorized');
   }
+
+  return session.user;
 }

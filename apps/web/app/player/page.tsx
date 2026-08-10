@@ -3,21 +3,13 @@ import { NextCoachingSession } from './_components/NextCoachingSession';
 import { AttendanceStats } from './_components/AttendanceStats';
 import { CalendarWidget } from './_components/CalendarWidget';
 import { BottomNav } from '@/components/layout/BottomNav';
-import { createClient } from '@/lib/server';
 import { redirect } from 'next/navigation';
 import { requireRole } from '@/lib/dal';
 import { prisma } from '@packages/database';
 import { signOut } from '@/app/(auth)/_actions/auth';
 
 export default async function PlayerPage() {
-  const supabase = await createClient();
-  const { data: { user }, error } = await supabase.auth.getUser();
-
-  if (error || !user) {
-    redirect('/login');
-  }
-
-  await requireRole(user.id, ['player', 'parent']);
+  const user = await requireRole(['player', 'parent']);
 
   // Fetch player data along with their attendance
   const player = await prisma.player.findFirst({

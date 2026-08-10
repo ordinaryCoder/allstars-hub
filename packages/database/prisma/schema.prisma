@@ -45,6 +45,7 @@ model User {
   attendance_marked Attendance[]      @relation("MarkedBy")
   parent_of         ParentPlayer[]
   coachLocations    CoachLocation[]
+  players           Player[]          @relation("UserPlayers")
 
   @@map("users")
 }
@@ -119,6 +120,7 @@ model Player {
   dob         DateTime @db.Date
   is_active   Boolean  @default(true)
 
+  user       User?          @relation("UserPlayers", fields: [user_id], references: [id])
   academy    Academy        @relation(fields: [academy_id], references: [id])
   location   Location       @relation(fields: [location_id], references: [id])
   batches    PlayerBatch[]

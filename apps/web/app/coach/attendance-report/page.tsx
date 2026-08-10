@@ -1,8 +1,6 @@
 import Link from 'next/link';
-import { createClient } from '../../../lib/server';
 import { prisma } from '@packages/database';
-import { redirect } from 'next/navigation';
-import { requireRole } from '../../../lib/dal';
+import { requireRole } from '@/lib/dal';
 import { CoachBottomNav } from '@/components/layout/CoachBottomNav';
 import {
   AttendanceReportView,
@@ -14,15 +12,7 @@ import { PerformanceData } from '../_components/PerformanceTrack';
 export const revalidate = 30;
 
 export default async function AttendanceReportPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect('/login');
-  }
-  await requireRole(user.id, 'coach');
+  const user = await requireRole('coach');
 
   const now = new Date();
   const today = new Date(now);
@@ -34,43 +24,79 @@ export default async function AttendanceReportPage() {
   const sevenDaysAgo = new Date(today);
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-  // 1. Fetch total active players in the coach's assigned locations
-  const coachLocations = await prisma.coachLocation.findMany({
-    where: { user_id: user.id },
-    select: { location_id: true },
-  });
-  const locationIds = coachLocations.map((cl) => cl.location_id);
-
-  const activeLocationPlayers = await prisma.player.findMany({
-    where: {
-      location_id: { in: locationIds },
-      is_active: true,
-    },
-    select: { id: true },
-  });
-
-  const locationPlayerIdsSet = new Set(activeLocationPlayers.map((p) => p.id));
-  const totalLocationPlayersCount = locationPlayerIdsSet.size;
-
-  // 2. Fetch past performance sessions (last 30 days) for Weekly & Monthly Performance Track
-  const pastPerformanceSessions = await prisma.session.findMany({
-    where: {
-      OR: [
-        { coach_id: user.id },
-        { created_by: user.id },
-      ],
-      start_time: { gte: thirtyDaysAgo },
-    },
-    select: {
-      start_time: true,
-      attendance: {
-        select: {
-          player_id: true,
-          status: true,
+  // Execute all queries in parallel
+  const [
+    activeLocationPlayers,
+    totalLocationPlayersCount,
+    pastPerformanceSessions,
+    sessions,
+  ] = await Promise.all([
+    prisma.player.findMany({
+      where: {
+        location: {
+          coachLocations: { some: { user_id: user.id } },
+        },
+        is_active: true,
+      },
+      select: { id: true },
+    }),
+    prisma.player.count({
+      where: {
+        location: {
+          coachLocations: { some: { user_id: user.id } },
         },
       },
-    },
-  });
+    }),
+    prisma.session.findMany({
+      where: {
+        OR: [
+          { coach_id: user.id },
+          { created_by: user.id },
+        ],
+        start_time: { gte: thirtyDaysAgo },
+      },
+      select: {
+        start_time: true,
+        attendance: {
+          where: {
+            player: { is_active: true },
+          },
+          select: {
+            player_id: true,
+            status: true,
+          },
+        },
+      },
+    }),
+    prisma.session.findMany({
+      where: {
+        OR: [
+          { coach_id: user.id },
+          { created_by: user.id },
+        ],
+      },
+      select: {
+        id: true,
+        start_time: true,
+        location: { select: { name: true } },
+        _count: { select: { attendance: true } },
+        attendance: {
+          where: {
+            player: { is_active: true },
+          },
+          select: {
+            player_id: true,
+            status: true,
+            player: { select: { first_name: true, last_name: true, is_active: true } },
+          },
+        },
+      },
+      orderBy: { start_time: 'desc' },
+      take: 100,
+    }),
+  ]);
+
+  const locationPlayerIdsSet = new Set(activeLocationPlayers.map((p) => p.id));
 
   let weeklyMarked = 0;
   let weeklyPresent = 0;
@@ -112,31 +138,6 @@ export default async function AttendanceReportPage() {
     totalLocationPlayers: totalLocationPlayersCount,
   };
 
-  // 3. Fetch all recorded sessions for the coach (no batch query for Phase 1)
-  const sessions = await prisma.session.findMany({
-    where: {
-      OR: [
-        { coach_id: user.id },
-        { created_by: user.id },
-      ],
-    },
-    select: {
-      id: true,
-      start_time: true,
-      location: { select: { name: true } },
-      _count: { select: { attendance: true } },
-      attendance: {
-        select: {
-          player_id: true,
-          status: true,
-          player: { select: { first_name: true, last_name: true } },
-        },
-      },
-    },
-    orderBy: { start_time: 'desc' },
-    take: 100,
-  });
-
   const recordedSessions: RecordedSessionItem[] = sessions.map((session) => {
     const dateStr = new Date(session.start_time).toLocaleDateString('en-US', {
       month: 'short',
@@ -154,7 +155,6 @@ export default async function AttendanceReportPage() {
     ).length;
     const sessionTotal = session._count.attendance;
     const sessionRate = sessionTotal > 0 ? Math.round((sessionPresent / sessionTotal) * 100) : 0;
-    const sessionTitle = session.location?.name ? `${session.location.name} Session` : 'General Session';
 
     return {
       id: session.id,
@@ -167,7 +167,7 @@ export default async function AttendanceReportPage() {
     };
   });
 
-  // 4. Calculate low attendance players (< 80%)
+  // 4. Calculate low attendance players (< 80%) for strictly ACTIVE players
   const playerStatsMap = new Map<
     string,
     { name: string; locationName: string; expected: number; attended: number }
@@ -175,6 +175,9 @@ export default async function AttendanceReportPage() {
 
   sessions.forEach((session) => {
     session.attendance.forEach((att) => {
+      // Exclude inactive players (safety check)
+      if (att.player?.is_active === false) return;
+
       const playerId = att.player_id;
       const playerName = att.player ? `${att.player.first_name} ${att.player.last_name}` : 'Player';
       const locationName = session.location?.name || 'Assigned Location';
