@@ -1,16 +1,11 @@
 'use server';
 
-import { createClient } from '@/lib/server';
+import { requireRole } from '@/lib/dal';
 import { prisma } from '@packages/database';
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag } from 'next/cache';
 
 export async function updateProfile(formData: FormData) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
-  if (!user) {
-    throw new Error('Not authenticated');
-  }
+  const user = await requireRole(['player', 'parent']);
 
   await prisma.user.update({
     where: { id: user.id },
@@ -23,4 +18,6 @@ export async function updateProfile(formData: FormData) {
 
   revalidatePath('/player/profile');
   revalidatePath('/player');
+  revalidateTag('user-profiles', 'default');
+  revalidateTag('coach-player-list', 'default');
 }

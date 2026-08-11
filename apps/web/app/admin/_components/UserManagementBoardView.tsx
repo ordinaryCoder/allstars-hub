@@ -5,80 +5,100 @@ import { Pagination } from '@/components/ui/Pagination';
 import { ListSkeleton } from '@/components/ui/Loading';
 import {
   getUsersByCategory,
-  deactivatePlayer,
-  reactivatePlayer,
+  getPlayerRecords,
+  deactivatePlayerById,
+  reactivatePlayerById,
   getFilterOptionsAdmin,
 } from '../_actions/action';
 
-import type { User, ViewMode } from './user-management/types';
+import type { User, PlayerRecord, ViewMode } from './user-management/types';
 import { getPermissionsStr } from './user-management/types';
 import { FilterDropdown } from './user-management/FilterDropdown';
 import { SearchInput } from './user-management/SearchInput';
 import { ActiveUserCard } from './user-management/ActiveUserCard';
+import { PlayerRecordCard } from './user-management/PlayerRecordCard';
 import { PendingUserCard } from './user-management/PendingUserCard';
 import { DeactivateConfirmModal } from './user-management/DeactivateConfirmModal';
 import { ReactivateConfirmModal } from './user-management/ReactivateConfirmModal';
 
 export type { User };
 
-export function UserManagementBoardView({ initialPlayers = [] }: { initialPlayers?: User[] }) {
+// ── helpers ──────────────────────────────────────────────────────────────────
+
+/** True for view modes that show individual player records */
+const isPlayerView = (mode: ViewMode) => mode === 'players' || mode === 'inactive';
+
+export function UserManagementBoardView({ initialPlayers = [] }: { initialPlayers?: PlayerRecord[] }) {
   const [viewMode, setViewMode] = useState<ViewMode>('players');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedLocationId, setSelectedLocationId] = useState<string>('all');
-
   const [filterLocations, setFilterLocations] = useState<Array<{ id: string; name: string }>>([]);
 
-  const [userMap, setUserMap] = useState<Record<string, User[]>>({
+  // Player records (players / inactive views)
+  const [playerRecordMap, setPlayerRecordMap] = useState<Partial<Record<'players' | 'inactive', PlayerRecord[]>>>({
     players: initialPlayers,
   });
-  const [isLoading, setIsLoading] = useState(false);
 
+  // User records (coaches / pending views)
+  const [userMap, setUserMap] = useState<Record<string, User[]>>({});
+
+  const [isLoading, setIsLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  // Deactivation and Reactivation Modal States
-  const [userToDeactivate, setUserToDeactivate] = useState<User | null>(null);
-  const [userToReactivate, setUserToReactivate] = useState<User | null>(null);
+  // Confirmation state — uses minimal NamedEntity shape via the modal
+  const [playerToDeactivate, setPlayerToDeactivate] = useState<PlayerRecord | null>(null);
+  const [playerToReactivate, setPlayerToReactivate] = useState<PlayerRecord | null>(null);
   const [isSubmittingAction, setIsSubmittingAction] = useState(false);
 
   // Load location filter options on mount
   useEffect(() => {
     getFilterOptionsAdmin()
-      .then((opts) => {
-        setFilterLocations(opts.locations);
-      })
-      .catch((err) => {
-        console.error('Failed to load filter options for admin:', err);
-      });
+      .then((opts) => setFilterLocations(opts.locations))
+      .catch((err) => console.error('Failed to load filter options:', err));
   }, []);
 
-  // Fetch data on demand upon dropdown selection if not already cached
+  // Fetch data when view mode changes (cached after first load)
   useEffect(() => {
-    if (userMap[viewMode]) {
-      setIsLoading(false);
-      return;
+    if (isPlayerView(viewMode)) {
+      const key = viewMode as 'players' | 'inactive';
+      if (playerRecordMap[key]) { setIsLoading(false); return; }
+
+      let mounted = true;
+      setIsLoading(true);
+      getPlayerRecords(viewMode === 'players' ? 'active' : 'inactive')
+        .then((data) => {
+          if (mounted) {
+            setPlayerRecordMap((prev) => ({ ...prev, [key]: data }));
+            setIsLoading(false);
+          }
+        })
+        .catch((err) => {
+          console.error('Failed to fetch player records:', err);
+          if (mounted) setIsLoading(false);
+        });
+      return () => { mounted = false; };
+    } else {
+      if (userMap[viewMode]) { setIsLoading(false); return; }
+
+      let mounted = true;
+      setIsLoading(true);
+      getUsersByCategory(viewMode as 'coaches' | 'pending')
+        .then((data) => {
+          if (mounted) {
+            setUserMap((prev) => ({ ...prev, [viewMode]: data }));
+            setIsLoading(false);
+          }
+        })
+        .catch((err) => {
+          console.error('Failed to fetch users:', err);
+          if (mounted) setIsLoading(false);
+        });
+      return () => { mounted = false; };
     }
+  }, [viewMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    let isMounted = true;
-    setIsLoading(true);
-
-    getUsersByCategory(viewMode)
-      .then((data) => {
-        if (isMounted) {
-          setUserMap((prev) => ({ ...prev, [viewMode]: data }));
-          setIsLoading(false);
-        }
-      })
-      .catch((err) => {
-        console.error('Failed to fetch users category:', err);
-        if (isMounted) setIsLoading(false);
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [viewMode, userMap]);
-
+  // Reset filters when switching modes
   useEffect(() => {
     setSelectedLocationId('all');
     setCurrentPage(1);
@@ -88,39 +108,59 @@ export function UserManagementBoardView({ initialPlayers = [] }: { initialPlayer
     setCurrentPage(1);
   }, [pageSize, searchQuery, selectedLocationId]);
 
-  const currentUsers = userMap[viewMode] || [];
+  // ── Filtered list ─────────────────────────────────────────────────────────
 
-  const filteredList = useMemo(() => {
-    return currentUsers.filter((user) => {
-      // 1. Search Query filter
+  const filteredPlayerRecords = useMemo<PlayerRecord[]>(() => {
+    if (!isPlayerView(viewMode)) return [];
+    const key = viewMode as 'players' | 'inactive';
+    const records = playerRecordMap[key] ?? [];
+
+    return records.filter((p) => {
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const fullName = `${p.first_name} ${p.last_name}`.toLowerCase();
+        const parentNames = (p.parent_accounts ?? [])
+          .map((a) => `${a.first_name} ${a.last_name}`)
+          .join(' ')
+          .toLowerCase();
+        const linkedName = p.linked_user
+          ? `${p.linked_user.first_name} ${p.linked_user.last_name}`.toLowerCase()
+          : '';
+        if (
+          !fullName.includes(q) &&
+          !parentNames.includes(q) &&
+          !linkedName.includes(q)
+        ) return false;
+      }
+      if (selectedLocationId !== 'all' && p.location?.id !== selectedLocationId) return false;
+      return true;
+    });
+  }, [viewMode, playerRecordMap, searchQuery, selectedLocationId]);
+
+  const filteredUserList = useMemo<User[]>(() => {
+    if (isPlayerView(viewMode)) return [];
+    const users = userMap[viewMode] ?? [];
+
+    return users.filter((user) => {
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
         const fullName = `${user.first_name || ''} ${user.last_name || ''}`.toLowerCase();
         const email = (user.email || '').toLowerCase();
         const mobile = (user.mobile_number || '').toLowerCase();
-        const matchesSearch = fullName.includes(q) || email.includes(q) || mobile.includes(q);
-        if (!matchesSearch) return false;
+        if (!fullName.includes(q) && !email.includes(q) && !mobile.includes(q)) return false;
       }
-
-      // Location filter applies to 'players' and 'inactive' categories
-      if (viewMode === 'players' || viewMode === 'inactive') {
-        const infos = user.locationInfos || [];
-
-        // 2. Location Filter
-        if (selectedLocationId !== 'all') {
-          const matchesLocation = infos.some((info) => info.locationId === selectedLocationId);
-          if (!matchesLocation) return false;
-        }
-      }
-
       return true;
     });
-  }, [currentUsers, searchQuery, viewMode, selectedLocationId]);
+  }, [viewMode, userMap, searchQuery]);
 
+  // Select whichever filtered list is active
+  const filteredList = isPlayerView(viewMode) ? filteredPlayerRecords : filteredUserList;
   const totalRecords = filteredList.length;
   const totalPages = Math.max(1, Math.ceil(totalRecords / pageSize));
   const startIndex = (currentPage - 1) * pageSize;
   const paginatedList = filteredList.slice(startIndex, startIndex + pageSize);
+
+  // ── Pending user helpers (user-based) ─────────────────────────────────────
 
   const handleRemovePending = (id: string) => {
     setUserMap((prev) => ({
@@ -129,18 +169,23 @@ export function UserManagementBoardView({ initialPlayers = [] }: { initialPlayer
     }));
   };
 
+  // ── Player record deactivation / reactivation ─────────────────────────────
+
   const handleConfirmDeactivate = async () => {
-    if (!userToDeactivate) return;
+    if (!playerToDeactivate) return;
     setIsSubmittingAction(true);
     try {
-      const res = await deactivatePlayer(userToDeactivate.id);
+      const res = await deactivatePlayerById(playerToDeactivate.id);
       if (res.success) {
-        setUserMap((prev) => ({
+        // Remove from active list; optionally prepend to inactive cache if loaded
+        setPlayerRecordMap((prev) => ({
           ...prev,
-          players: (prev.players || []).filter((u) => u.id !== userToDeactivate.id),
-          ...(prev.inactive ? { inactive: [userToDeactivate, ...prev.inactive] } : {}),
+          players: (prev.players ?? []).filter((p) => p.id !== playerToDeactivate.id),
+          ...(prev.inactive
+            ? { inactive: [{ ...playerToDeactivate, is_active: false }, ...prev.inactive] }
+            : {}),
         }));
-        setUserToDeactivate(null);
+        setPlayerToDeactivate(null);
       } else {
         alert(res.error || 'Failed to deactivate player');
       }
@@ -152,17 +197,19 @@ export function UserManagementBoardView({ initialPlayers = [] }: { initialPlayer
   };
 
   const handleConfirmReactivate = async () => {
-    if (!userToReactivate) return;
+    if (!playerToReactivate) return;
     setIsSubmittingAction(true);
     try {
-      const res = await reactivatePlayer(userToReactivate.id);
+      const res = await reactivatePlayerById(playerToReactivate.id);
       if (res.success) {
-        setUserMap((prev) => ({
+        setPlayerRecordMap((prev) => ({
           ...prev,
-          inactive: (prev.inactive || []).filter((u) => u.id !== userToReactivate.id),
-          ...(prev.players ? { players: [userToReactivate, ...prev.players] } : {}),
+          inactive: (prev.inactive ?? []).filter((p) => p.id !== playerToReactivate.id),
+          ...(prev.players
+            ? { players: [{ ...playerToReactivate, is_active: true }, ...prev.players] }
+            : {}),
         }));
-        setUserToReactivate(null);
+        setPlayerToReactivate(null);
       } else {
         alert(res.error || 'Failed to reactivate player');
       }
@@ -172,6 +219,8 @@ export function UserManagementBoardView({ initialPlayers = [] }: { initialPlayer
       setIsSubmittingAction(false);
     }
   };
+
+  // ── Header text ───────────────────────────────────────────────────────────
 
   const getHeaderTitle = () => {
     if (viewMode === 'players') return `ACTIVE PLAYERS (${filteredList.length})`;
@@ -185,24 +234,31 @@ export function UserManagementBoardView({ initialPlayers = [] }: { initialPlayer
       const locName = filterLocations.find((l) => l.id === selectedLocationId)?.name || 'this location';
       return `No ${viewMode === 'players' ? 'active players' : 'inactive players'} found at ${locName}.`;
     }
-    return `No ${viewMode === 'players' ? 'active players' : viewMode === 'coaches' ? 'active coaches' : viewMode === 'inactive' ? 'inactive players' : 'pending users'} found.`;
+    if (viewMode === 'players') return 'No active players found.';
+    if (viewMode === 'inactive') return 'No inactive players found.';
+    if (viewMode === 'coaches') return 'No active coaches found.';
+    return 'No pending users found.';
   };
+
+  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <div className="flex flex-col gap-6 w-full relative">
-      {/* Header Section */}
+      {/* Header */}
       <section className="flex flex-col gap-1">
         <h2 className="text-[20px] leading-[28px] font-bold text-slate-900">User Management</h2>
-        <p className="text-[14px] leading-[20px] text-slate-500">Manage access and roles for all academy members.</p>
+        <p className="text-[14px] leading-[20px] text-slate-500">
+          Manage access and roles for all academy members.
+        </p>
       </section>
 
-      {/* Controls Section: Search, Category Filter, and Location Filter */}
+      {/* Controls */}
       <div className="flex flex-col gap-3">
         <SearchInput value={searchQuery} onChange={setSearchQuery} />
         <FilterDropdown value={viewMode} onChange={setViewMode} disabled={isLoading} />
 
-        {/* Location Filter for Active/Inactive Players */}
-        {(viewMode === 'players' || viewMode === 'inactive') && filterLocations.length > 0 && (
+        {/* Location filter for player views */}
+        {isPlayerView(viewMode) && filterLocations.length > 0 && (
           <div className="relative w-full">
             <label className="sr-only" htmlFor="admin-location-filter">Filter by Location</label>
             <select
@@ -225,7 +281,7 @@ export function UserManagementBoardView({ initialPlayers = [] }: { initialPlayer
         )}
       </div>
 
-      {/* Dynamic User List / Global Skeleton */}
+      {/* List */}
       <div className="flex flex-col gap-3 min-h-[40vh]">
         <h3 className="text-[12px] font-semibold text-slate-500 px-1 uppercase tracking-wider">
           {getHeaderTitle()}
@@ -237,8 +293,20 @@ export function UserManagementBoardView({ initialPlayers = [] }: { initialPlayer
           <div className="text-center text-sm text-slate-500 py-8 bg-white rounded-2xl border border-slate-200 shadow-sm">
             {getEmptyMessage()}
           </div>
+        ) : isPlayerView(viewMode) ? (
+          // ── Player record cards ──
+          (paginatedList as PlayerRecord[]).map((player) => (
+            <PlayerRecordCard
+              key={player.id}
+              player={player}
+              isInactive={viewMode === 'inactive'}
+              onDeactivate={viewMode === 'players' ? setPlayerToDeactivate : undefined}
+              onReactivate={viewMode === 'inactive' ? setPlayerToReactivate : undefined}
+            />
+          ))
         ) : (
-          paginatedList.map((user) => {
+          // ── User cards (coaches / pending) ──
+          (paginatedList as User[]).map((user) => {
             if (viewMode === 'pending') {
               return <PendingUserCard key={user.id} user={user} onApprove={handleRemovePending} />;
             }
@@ -247,15 +315,15 @@ export function UserManagementBoardView({ initialPlayers = [] }: { initialPlayer
                 key={user.id}
                 user={user}
                 isAdmin={getPermissionsStr(user).includes('admin')}
-                onDeactivate={setUserToDeactivate}
-                onReactivate={setUserToReactivate}
-                isInactive={viewMode === 'inactive'}
+                onDeactivate={undefined}
+                onReactivate={undefined}
+                isInactive={false}
               />
             );
           })
         )}
 
-        {/* Shared Pagination Controls */}
+        {/* Pagination */}
         {!isLoading && totalRecords > 0 && (
           <Pagination
             currentPage={currentPage}
@@ -270,19 +338,19 @@ export function UserManagementBoardView({ initialPlayers = [] }: { initialPlayer
         )}
       </div>
 
-      {/* Confirmation Dialog Modals */}
+      {/* Confirmation modals — work for PlayerRecord via NamedEntity */}
       <DeactivateConfirmModal
-        user={userToDeactivate}
-        isOpen={Boolean(userToDeactivate)}
-        onClose={() => setUserToDeactivate(null)}
+        user={playerToDeactivate}
+        isOpen={Boolean(playerToDeactivate)}
+        onClose={() => setPlayerToDeactivate(null)}
         onConfirm={handleConfirmDeactivate}
         isSubmitting={isSubmittingAction}
       />
 
       <ReactivateConfirmModal
-        user={userToReactivate}
-        isOpen={Boolean(userToReactivate)}
-        onClose={() => setUserToReactivate(null)}
+        user={playerToReactivate}
+        isOpen={Boolean(playerToReactivate)}
+        onClose={() => setPlayerToReactivate(null)}
         onConfirm={handleConfirmReactivate}
         isSubmitting={isSubmittingAction}
       />

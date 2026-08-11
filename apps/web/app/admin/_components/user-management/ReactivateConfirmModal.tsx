@@ -1,9 +1,9 @@
 'use client';
 
-import type { User } from './types';
+import type { NamedEntity } from './types';
 
 interface ReactivateConfirmModalProps {
-  user: User | null;
+  user: NamedEntity | null;
   isOpen: boolean;
   onClose: () => void;
   onConfirm: () => void;

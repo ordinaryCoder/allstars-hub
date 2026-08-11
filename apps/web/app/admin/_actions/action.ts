@@ -97,12 +97,7 @@ const playerUserSelect = {
     select: {
       id: true,
       location_id: true,
-      location: {
-        select: {
-          id: true,
-          name: true,
-        },
-      },
+      location: { select: { id: true, name: true } },
     },
   },
   parent_of: {
@@ -111,12 +106,7 @@ const playerUserSelect = {
         select: {
           id: true,
           location_id: true,
-          location: {
-            select: {
-              id: true,
-              name: true,
-            },
-          },
+          location: { select: { id: true, name: true } },
         },
       },
     },
@@ -276,6 +266,8 @@ export async function deactivatePlayer(userId: string): Promise<{ success: boole
     revalidatePath('/coach/new-session');
     revalidatePath('/coach/attendance-report');
     revalidateTag('player-counts', 'default');
+    revalidateTag('coach-player-list', 'default');
+    revalidateTag('user-profiles', 'default');
 
     return { success: true };
   } catch (error: any) {
@@ -310,6 +302,8 @@ export async function reactivatePlayer(userId: string): Promise<{ success: boole
     revalidatePath('/coach/new-session');
     revalidatePath('/coach/attendance-report');
     revalidateTag('player-counts', 'default');
+    revalidateTag('coach-player-list', 'default');
+    revalidateTag('user-profiles', 'default');
 
     return { success: true };
   } catch (error: any) {
@@ -326,6 +320,8 @@ export async function addPlayerAdmin(formData: FormData): Promise<{ success: fal
   if (!res.success) return { success: false, error: res.error };
   revalidatePath('/admin');
   revalidateTag('player-counts', 'default');
+  revalidateTag('coach-player-list', 'default');
+  revalidateTag('user-profiles', 'default');
   return { success: true, email: res.email, passwordUsed: res.passwordUsed || DEFAULT_PRESET_PASSWORD };
 }
 
@@ -450,5 +446,119 @@ export async function addCoachAdmin(formData: FormData): Promise<{ success: fals
   revalidatePath('/admin');
   revalidateTag('locations', 'default');
   revalidateTag('player-counts', 'default');
+  revalidateTag('coach-player-list', 'default');
+  revalidateTag('user-profiles', 'default');
   return { success: true, email, passwordUsed: password };
 }
+
+/**
+ * Fetches individual player records (from the players table) for the admin board.
+ * Each row is one player — parents with multiple children appear as separate rows.
+ */
+export async function getPlayerRecords(status: 'active' | 'inactive') {
+  await requireRole('admin');
+
+  const players = await prisma.player.findMany({
+    where: { is_active: status === 'active' },
+    select: {
+      id: true,
+      first_name: true,
+      last_name: true,
+      dob: true,
+      is_active: true,
+      location: { select: { id: true, name: true } },
+      // Self-login user linked directly
+      user: {
+        select: {
+          id: true,
+          first_name: true,
+          last_name: true,
+          email: true,
+        },
+      },
+      // Parent accounts linked via parent_player join table
+      parents: {
+        select: {
+          parent: {
+            select: {
+              id: true,
+              first_name: true,
+              last_name: true,
+              email: true,
+            },
+          },
+        },
+      },
+    },
+    orderBy: [{ location: { name: 'asc' } }, { first_name: 'asc' }],
+  });
+
+  return players.map((p) => ({
+    id: p.id,
+    first_name: p.first_name,
+    last_name: p.last_name,
+    dob: p.dob,
+    is_active: p.is_active,
+    location: p.location ?? null,
+    linked_user: p.user ?? null,
+    parent_accounts: p.parents.map((pp) => pp.parent),
+  }));
+}
+
+/**
+ * Deactivates a single player record by its players.id (not a user account id).
+ */
+export async function deactivatePlayerById(
+  playerId: string,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await requireRole('admin');
+    if (!playerId) return { success: false, error: 'Player ID is required' };
+
+    await prisma.player.update({
+      where: { id: playerId },
+      data: { is_active: false },
+    });
+
+    revalidatePath('/admin');
+    revalidatePath('/coach/player-list');
+    revalidatePath('/coach/new-session');
+    revalidatePath('/coach/attendance-report');
+    revalidateTag('player-counts', 'default');
+    revalidateTag('coach-player-list', 'default');
+
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error deactivating player:', error);
+    return { success: false, error: error?.message || 'Failed to deactivate player' };
+  }
+}
+
+/**
+ * Reactivates a single player record by its players.id.
+ */
+export async function reactivatePlayerById(
+  playerId: string,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await requireRole('admin');
+    if (!playerId) return { success: false, error: 'Player ID is required' };
+
+    await prisma.player.update({
+      where: { id: playerId },
+      data: { is_active: true },
+    });
+
+    revalidatePath('/admin');
+    revalidatePath('/coach/player-list');
+    revalidatePath('/coach/new-session');
+    revalidatePath('/coach/attendance-report');
+    revalidateTag('player-counts', 'default');
+    revalidateTag('coach-player-list', 'default');
+
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error reactivating player:', error);
+    return { success: false, error: error?.message || 'Failed to reactivate player' };
+  }
+}

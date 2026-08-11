@@ -1,10 +1,8 @@
-import { getUsersByCategory } from '../_actions/action';
-import { UserManagementBoardView, type User } from './UserManagementBoardView';
-
-export type { User };
+import { getPlayerRecords } from '../_actions/action';
+import { UserManagementBoardView } from './UserManagementBoardView';
 
 export async function UserManagementBoard() {
-  // Reuse the single authoritative Server Action fetcher for initial SSR load
-  const initialPlayers = await getUsersByCategory('players');
+  // SSR-prefetch active player records for instant first paint
+  const initialPlayers = await getPlayerRecords('active');
   return <UserManagementBoardView initialPlayers={initialPlayers} />;
 }

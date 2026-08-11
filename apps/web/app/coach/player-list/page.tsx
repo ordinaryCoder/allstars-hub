@@ -1,71 +1,12 @@
 import { requireRole } from '@/lib/dal';
-import { prisma } from '@packages/database';
+import { getCoachPlayersListCached } from '@/lib/cached-queries';
 import { CoachBottomNav } from '@/components/layout/CoachBottomNav';
 import { PlayerListBoard, SerializedPlayer, SerializedLocation } from './_components/PlayerListBoard';
 
 export default async function CoachPlayersListPage() {
   const user = await requireRole('coach');
 
-  // Fetch coach's assigned locations and players in parallel
-  const [coachLocations, rawPlayers] = await Promise.all([
-    prisma.coachLocation.findMany({
-      where: { user_id: user.id },
-      include: { location: true },
-    }),
-    prisma.player.findMany({
-      where: {
-        location: {
-          coachLocations: { some: { user_id: user.id } },
-        },
-      },
-      include: {
-        location: true,
-        parents: {
-          include: { parent: true },
-        },
-      },
-      orderBy: [
-        { location: { name: 'asc' } },
-        { first_name: 'asc' },
-      ],
-    }),
-  ]);
-
-  const locations: SerializedLocation[] = coachLocations.map(cl => ({
-    id: cl.location.id,
-    name: cl.location.name,
-    address: cl.location.address,
-  }));
-
-  const players: SerializedPlayer[] = rawPlayers.map((p) => {
-    let age: number | null = null;
-    if (p.dob) {
-      const birthDate = new Date(p.dob);
-      const today = new Date();
-      age = today.getFullYear() - birthDate.getFullYear();
-      const m = today.getMonth() - birthDate.getMonth();
-      if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-        age--;
-      }
-    }
-
-    return {
-      id: p.id,
-      firstName: p.first_name,
-      lastName: p.last_name,
-      dob: p.dob.toISOString(),
-      age,
-      isActive: p.is_active,
-      locationId: p.location_id,
-      locationName: p.location?.name || 'Unknown Location',
-      parents: p.parents.map((pp) => ({
-        id: pp.parent.id,
-        name: `${pp.parent.first_name} ${pp.parent.last_name}`.trim(),
-        phone: pp.parent.mobile_number ?? null,
-        email: pp.parent.email,
-      })),
-    };
-  });
+  const { locations, players } = await getCoachPlayersListCached(user.id);
 
   return (
     <div className="bg-slate-50 text-slate-900 antialiased min-h-screen font-sans">

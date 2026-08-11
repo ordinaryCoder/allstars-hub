@@ -20,7 +20,6 @@ export function ActiveUserCard({
   isInactive = false,
 }: ActiveUserCardProps) {
   const permStr = getPermissionsStr(user);
-  const isPlayerOrParent = permStr.includes('player') || permStr.includes('parent');
   const roleText = getPrimaryRole(user);
 
   return (
@@ -51,7 +50,7 @@ export function ActiveUserCard({
           <span className="text-[13px] text-slate-900">{user.mobile_number || 'N/A'}</span>
         </div>
 
-        {/* Right Column: Role directly above Action Icon */}
+        {/* Right Column: Role + Action */}
         <div className="flex flex-col items-end justify-center gap-1 flex-shrink-0 ml-2">
           {isAdmin ? (
             <div className="flex items-center gap-1 text-slate-900">
@@ -73,9 +72,9 @@ export function ActiveUserCard({
             </span>
           )}
 
-          {/* Deactivation Icon Button with Tooltip */}
-          {!isAdmin && onDeactivate && isPlayerOrParent && !isInactive && (
-            <Tooltip content="Deactivate Player" position="left">
+          {/* Deactivation button — coaches only in this card */}
+          {!isAdmin && onDeactivate && !isInactive && (
+            <Tooltip content="Deactivate" position="left">
               <button
                 type="button"
                 onClick={() => onDeactivate(user)}
@@ -89,9 +88,9 @@ export function ActiveUserCard({
             </Tooltip>
           )}
 
-          {/* Reactivation Icon Button with Tooltip */}
+          {/* Reactivation button */}
           {onReactivate && isInactive && (
-            <Tooltip content="Reactivate Player" position="left">
+            <Tooltip content="Reactivate" position="left">
               <button
                 type="button"
                 onClick={() => onReactivate(user)}

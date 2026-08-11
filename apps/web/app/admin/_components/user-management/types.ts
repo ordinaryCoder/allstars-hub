@@ -19,6 +19,26 @@ export interface User {
   locationInfos?: UserLocationInfo[];
 }
 
+/** An individual player record from the players table. */
+export interface PlayerRecord {
+  id: string; // players.id (UUID)
+  first_name: string;
+  last_name: string;
+  dob?: Date | string | null;
+  is_active: boolean;
+  location?: { id: string; name: string } | null;
+  /** The user account directly linked (self-login player) */
+  linked_user?: { id: string; first_name: string; last_name: string; email?: string | null } | null;
+  /** Parent accounts linked via parent_player */
+  parent_accounts?: Array<{ id: string; first_name: string; last_name: string; email?: string | null }>;
+}
+
+/** Minimal shape required by confirmation modals — satisfied by both User and PlayerRecord */
+export interface NamedEntity {
+  first_name?: string | null;
+  last_name?: string | null;
+}
+
 export type ViewMode = 'players' | 'coaches' | 'pending' | 'inactive';
 
 export const getPermissionsStr = (user: User): string => {
