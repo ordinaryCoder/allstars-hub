@@ -34,12 +34,17 @@ interface PlayerListBoardProps {
 
 export function PlayerListBoard({ players, locations }: PlayerListBoardProps) {
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'active' | 'inactive'>('active');
   const [selectedLocationId, setSelectedLocationId] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
 
   const filteredPlayers = useMemo(() => {
     return players.filter((player) => {
+      // Status filter
+      if (statusFilter === 'active' && !player.isActive) return false;
+      if (statusFilter === 'inactive' && player.isActive) return false;
+
       // Location filter
       if (selectedLocationId !== 'all' && player.locationId !== selectedLocationId) {
         return false;
@@ -61,12 +66,12 @@ export function PlayerListBoard({ players, locations }: PlayerListBoardProps) {
 
       return true;
     });
-  }, [players, selectedLocationId, searchTerm]);
+  }, [players, statusFilter, selectedLocationId, searchTerm]);
 
-  // Reset to first page when search query, location filter, or page size changes
+  // Reset to first page when search query, status filter, location filter, or page size changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, selectedLocationId, pageSize]);
+  }, [searchTerm, statusFilter, selectedLocationId, pageSize]);
 
   const totalRecords = filteredPlayers.length;
   const totalPages = Math.max(1, Math.ceil(totalRecords / pageSize));
@@ -75,7 +80,7 @@ export function PlayerListBoard({ players, locations }: PlayerListBoardProps) {
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Search & Location Filter Section */}
+      {/* Search & Status/Location Filter Section */}
       <div className="flex flex-col gap-3">
         {/* Search Bar */}
         <div className="relative w-full">
@@ -97,6 +102,23 @@ export function PlayerListBoard({ players, locations }: PlayerListBoardProps) {
               <span className="material-symbols-outlined text-[18px]">close</span>
             </button>
           )}
+        </div>
+
+        {/* Status Filter Dropdown */}
+        <div className="relative w-full">
+          <label className="sr-only" htmlFor="coach-player-status-filter">Filter Players Status</label>
+          <select
+            id="coach-player-status-filter"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as 'active' | 'inactive')}
+            className="w-full h-[44px] pl-4 pr-10 appearance-none bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-900 focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 outline-none shadow-sm cursor-pointer transition-all"
+          >
+            <option value="active">Active Players</option>
+            <option value="inactive">Inactive Players</option>
+          </select>
+          <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500">
+            expand_more
+          </span>
         </div>
 
         {/* Location Tabs (if coach has multiple locations) */}

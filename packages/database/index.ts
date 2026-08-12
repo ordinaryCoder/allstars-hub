@@ -18,6 +18,9 @@ if (!databaseUrl) {
 
 const pool = new Pool({
   connectionString: databaseUrl,
+  max: 5, // Cap connection pool size to 5 per serverless instance
+  idleTimeoutMillis: 10000,
+  connectionTimeoutMillis: 5000,
 });
 
 const adapter = new PrismaPg(pool);
@@ -27,8 +30,7 @@ const globalForPrisma = globalThis as unknown as {
 };
 
 export const prisma = globalForPrisma.prisma ?? new PrismaClient({ adapter });
-
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
+globalForPrisma.prisma = prisma;
 
 // RLS Utility: Pass raw JWT access_token to scope Prisma queries to tenant context
 export const getTenantDb = (jwt?: string) => {

@@ -35,23 +35,47 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
     }
   )
 
-  // Do not run code between createServerClient and supabase.auth.getUser()
-  // This will refresh the session if it's expired
-  const { data: { user } } = await supabase.auth.getUser()
+  const pathname = request.nextUrl.pathname;
+  const isAuthPage = pathname.startsWith('/login') || pathname.startsWith('/signup');
+  const isPublicPage =
+    isAuthPage ||
+    pathname.startsWith('/contactus') ||
+    pathname.startsWith('/pending') ||
+    pathname.startsWith('/confirm-email');
 
-  if (!user && !request.nextUrl.pathname.startsWith('/login') && !request.nextUrl.pathname.startsWith('/signup') && !request.nextUrl.pathname.startsWith('/contactus') && !request.nextUrl.pathname.startsWith('/pending') && !request.nextUrl.pathname.startsWith('/confirm-email')) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/login'
-    const redirectResponse = NextResponse.redirect(url)
-    
-    // IMPORTANT: Copy cookies over so the session isn't lost
-    supabaseResponse.cookies.getAll().forEach((cookie) => {
-      redirectResponse.cookies.set(cookie.name, cookie.value)
-    })
-    return redirectResponse
+  const hasAuthCookie = request.cookies.getAll().some((c) => c.name.startsWith('sb-'));
+
+  // If user visits /login or /signup while ALREADY logged in, auto-redirect to dashboard
+  if (isAuthPage && hasAuthCookie) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/';
+      return NextResponse.redirect(url);
+    }
   }
 
-  return supabaseResponse
+  // Fast path for guests on public routes (0ms network delay)
+  if (isPublicPage) {
+    return supabaseResponse;
+  }
+
+  // Refresh session if expired and validate user identity on protected routes
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/login';
+    const redirectResponse = NextResponse.redirect(url);
+
+    // IMPORTANT: Copy cookies over so the session isn't lost
+    supabaseResponse.cookies.getAll().forEach((cookie) => {
+      redirectResponse.cookies.set(cookie.name, cookie.value);
+    });
+    return redirectResponse;
+  }
+
+  return supabaseResponse;
 }
 
 export const config: MiddlewareConfig = {

@@ -1,38 +1,47 @@
 import Link from 'next/link';
-import { createClient } from '../../../lib/server';
+import { requireRole } from '@/lib/dal';
 import { prisma } from '@packages/database';
-import { redirect } from 'next/navigation';
 import AttendanceRoster from './_components/AttendanceRoster';
 import { saveAttendance } from './_actions/action';
 
-export default async function NewSessionPage({ searchParams }: { searchParams: Promise<{ locationId?: string }> }) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect('/login');
-  }
+export default async function NewSessionPage({ searchParams }: { searchParams: Promise<{ locationId?: string; sessionId?: string }> }) {
+  const user = await requireRole('coach');
 
   const resolvedParams = await searchParams;
+  const sessionId = resolvedParams.sessionId || undefined;
+  const targetLocationId = resolvedParams.locationId;
 
-  // 1. Fetch locations assigned to the coach
-  const coachLocations = await prisma.coachLocation.findMany({
-    where: { user_id: user.id },
-    include: { location: true },
-  });
+  // 1. Fetch locations assigned to the coach (and players in parallel if locationId is known)
+  const [coachLocations, initialPlayers] = await Promise.all([
+    prisma.coachLocation.findMany({
+      where: { user_id: user.id },
+      include: { location: true },
+    }),
+    targetLocationId
+      ? prisma.player.findMany({
+          where: { location_id: targetLocationId, is_active: true },
+          orderBy: { first_name: 'asc' },
+          select: { id: true, first_name: true, last_name: true },
+        })
+      : Promise.resolve(null),
+  ]);
 
   const locations = coachLocations.map(cl => ({
     id: cl.location.id,
     name: cl.location.name,
   }));
 
-  // Default to first assigned location if not specified in searchParams
-  const selectedLocationId = resolvedParams.locationId || locations[0]?.id || '';
+  const selectedLocationId = targetLocationId || locations[0]?.id || '';
   const selectedLocation = locations.find(l => l.id === selectedLocationId) || locations[0];
 
-  // 2. Fetch ONLY players for the selected location
   let players: { id: string; firstName: string; lastName: string }[] = [];
-  if (selectedLocationId) {
+  if (initialPlayers) {
+    players = initialPlayers.map(p => ({
+      id: p.id,
+      firstName: p.first_name,
+      lastName: p.last_name,
+    }));
+  } else if (selectedLocationId) {
     const dbPlayers = await prisma.player.findMany({
       where: {
         location_id: selectedLocationId,
@@ -80,6 +89,7 @@ export default async function NewSessionPage({ searchParams }: { searchParams: P
           locations={locations}
           selectedLocationId={selectedLocationId}
           playersByLocation={playersByLocation} 
+          sessionId={sessionId}
           onSave={saveAttendance} 
         />
       </div>

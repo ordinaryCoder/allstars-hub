@@ -1,67 +1,116 @@
-import { prisma } from '@packages/database';
+import { Suspense } from 'react';
 import Link from 'next/link';
+import { prisma } from '@packages/database';
+import { getActiveLocationsCached, getActivePlayerCountsCached } from '@/lib/cached-queries';
 import { QuickActions } from './QuickActions';
 import { WeeklyAttendanceChart } from './WeeklyAttendanceChart';
 import { PastSessionCard } from './PastSessionCard';
 import { UpcomingSessionCard } from './UpcomingSessionCard';
 import { KpiCardsGrid } from './KpiCardsGrid';
+import {
+  KpiCardsSkeleton,
+  WeeklyChartSkeleton,
+  QuickActionsSkeleton,
+  SessionCardSkeleton,
+} from './skeletons/HomeSkeletons';
 
-export async function HomeTab() {
-  // Total Players KPI: Count of all active registered players in the academy
-  let totalPlayers = 0;
-  try {
-    totalPlayers = await prisma.player.count({
-      where: { is_active: true },
-    });
-  } catch (e) {
-    console.error("Player count query failed", e);
-  }
+export function HomeTab() {
+  return (
+    <>
+      <Suspense fallback={<KpiCardsSkeleton />}>
+        <KpiCardsSection />
+      </Suspense>
 
-  // Fallback to active parent/player users if player table count is 0
-  if (totalPlayers === 0) {
-    try {
-      const allActiveUsers = await prisma.user.findMany({
-        where: { status: 'ACTIVE' },
-        select: {
-          academy_roles: { select: { permissions: true } },
-        },
-      });
+      <Suspense fallback={<WeeklyChartSkeleton />}>
+        <WeeklyAttendanceSection />
+      </Suspense>
 
-      totalPlayers = allActiveUsers.filter((user) => {
-        const perms = user.academy_roles?.[0]?.permissions;
-        if (!perms) return false;
-        const permStr = Array.isArray(perms) ? perms.join(',').toLowerCase() : String(perms).toLowerCase();
-        return permStr.includes('parent') || permStr.includes('player');
-      }).length;
-    } catch (e) {
-      console.error("User fallback count failed", e);
-    }
-  }
+      <Suspense fallback={<QuickActionsSkeleton />}>
+        <QuickActionsSection />
+      </Suspense>
 
-  // Calculate attendance trend
+      <Suspense fallback={<SessionCardSkeleton />}>
+        <PastSessionSection />
+      </Suspense>
+
+      <Suspense fallback={<SessionCardSkeleton />}>
+        <UpcomingSessionsSection />
+      </Suspense>
+    </>
+  );
+}
+
+async function KpiCardsSection() {
   const now = new Date();
   const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
 
-  let thisMonthAttendance = 0;
-  let lastMonthAttendance = 0;
-
-  try {
-    thisMonthAttendance = await prisma.attendance.count({
+  const [
+    totalPlayersRes,
+    thisMonthAttendanceRes,
+    lastMonthAttendanceRes,
+    locationPlayerCountsRes,
+    monthlySessionsRes,
+    activePlayersCountRes,
+  ] = await Promise.allSettled([
+    prisma.player.count({ where: { is_active: true } }),
+    prisma.attendance.count({
       where: {
         marked_at: { gte: startOfThisMonth },
         status: { in: ['PRESENT', 'LATE'] },
       },
-    });
-    lastMonthAttendance = await prisma.attendance.count({
+    }),
+    prisma.attendance.count({
       where: {
         marked_at: { gte: startOfLastMonth, lt: startOfThisMonth },
         status: { in: ['PRESENT', 'LATE'] },
       },
-    });
-  } catch (error) {
-    console.error("Attendance query failed:", error);
+    }),
+    getActivePlayerCountsCached(),
+    prisma.session.findMany({
+      where: { start_time: { gte: startOfThisMonth, lte: now } },
+      select: {
+        id: true,
+        location_id: true,
+        _count: { select: { attendance: true } },
+        attendance: {
+          where: { status: { in: ['PRESENT', 'LATE'] } },
+          select: { id: true },
+        },
+      },
+    }),
+    prisma.player.count({
+      where: {
+        is_active: true,
+        attendance: { some: { status: { in: ['PRESENT', 'LATE'] } } },
+      },
+    }),
+  ]);
+
+  let totalPlayers = totalPlayersRes.status === 'fulfilled' ? totalPlayersRes.value : 0;
+
+  if (totalPlayers === 0) {
+    try {
+      totalPlayers = await prisma.user.count({
+        where: {
+          status: 'ACTIVE',
+          academy_roles: {
+            some: {
+              OR: [
+                { permissions: { array_contains: 'player' } },
+                { permissions: { array_contains: 'parent' } },
+              ],
+            },
+          },
+        },
+      });
+    } catch (e) {
+      console.error('User fallback count failed', e);
+    }
   }
+
+  const thisMonthAttendance = thisMonthAttendanceRes.status === 'fulfilled' ? thisMonthAttendanceRes.value : 0;
+  const lastMonthAttendance = lastMonthAttendanceRes.status === 'fulfilled' ? lastMonthAttendanceRes.value : 0;
 
   let trendPercent = 0;
   if (lastMonthAttendance > 0) {
@@ -70,103 +119,30 @@ export async function HomeTab() {
     trendPercent = 100;
   }
 
-  const isUp = trendPercent > 0;
-  const isDown = trendPercent < 0;
-  const trendIcon = isUp ? 'trending_up' : isDown ? 'trending_down' : 'horizontal_rule';
-  const trendColor = isUp ? 'text-emerald-500' : isDown ? 'text-rose-500' : 'text-slate-500';
-  const trendSign = isUp ? '+' : '';
+  const locationPlayerCounts = locationPlayerCountsRes.status === 'fulfilled' ? locationPlayerCountsRes.value : {};
 
-  // Fetch active locations
-  const locations = await prisma.location.findMany({
-    select: { id: true, name: true }
-  });
-
-  // Efficient single query to count active players per location
-  const locationPlayerCounts: Record<string, number> = {};
-  try {
-    const activePlayersPerLocation = await prisma.player.groupBy({
-      by: ['location_id'],
-      where: { is_active: true },
-      _count: { _all: true },
-    });
-    activePlayersPerLocation.forEach((group) => {
-      if (group.location_id) {
-        locationPlayerCounts[group.location_id] = group._count._all;
-      }
-    });
-  } catch (e) {
-    console.error("Location player counts fetch failed", e);
-  }
-
-  // Get boundaries for the current week (Monday - Sunday)
-  const dayOfWeek = now.getDay() || 7;
-  const startOfWeek = new Date(now);
-  startOfWeek.setDate(now.getDate() - dayOfWeek + 1);
-  startOfWeek.setHours(0, 0, 0, 0);
-  const endOfWeek = new Date(startOfWeek);
-  endOfWeek.setDate(startOfWeek.getDate() + 6);
-  endOfWeek.setHours(23, 59, 59, 999);
-
-  let weeklyAttendances: { player_id: string; marked_at: Date; session: { location_id: string } }[] = [];
-  try {
-    weeklyAttendances = await prisma.attendance.findMany({
-      where: {
-        marked_at: { gte: startOfWeek, lte: endOfWeek },
-        status: { in: ['PRESENT', 'LATE'] },
-      },
-      select: {
-        player_id: true,
-        marked_at: true,
-        session: { select: { location_id: true } }
-      }
-    });
-  } catch (e) {
-    console.error("Weekly attendance fetch failed", e);
-  }
-
-  // Monthly attendance metrics (average attendance rate for sessions conducted this month)
+  const monthlySessions = monthlySessionsRes.status === 'fulfilled' ? monthlySessionsRes.value : [];
   let monthlyAttendancePercent = 0;
-  try {
-    const monthlySessions = await prisma.session.findMany({
-      where: {
-        start_time: { gte: startOfThisMonth, lte: now },
-      },
-      select: {
-        id: true,
-        location_id: true,
-        attendance: {
-          select: { status: true },
-        },
-      },
-    });
+  if (monthlySessions.length > 0) {
+    let totalPercentSum = 0;
+    let evaluatedSessions = 0;
 
-    if (monthlySessions.length > 0) {
-      let totalPercentSum = 0;
-      let evaluatedSessions = 0;
-
-      for (const sess of monthlySessions) {
-        if (sess.attendance.length > 0) {
-          const attended = sess.attendance.filter(
-            (a) => a.status === 'PRESENT' || a.status === 'LATE'
-          ).length;
-          let locationPlayers = 0;
-          if (sess.location_id) {
-            locationPlayers = locationPlayerCounts[sess.location_id] || 0;
-          }
-          const denominator = Math.max(locationPlayers, sess.attendance.length);
-          if (denominator > 0) {
-            totalPercentSum += Math.round((attended / denominator) * 100);
-            evaluatedSessions++;
-          }
+    for (const sess of monthlySessions) {
+      const totalMarked = sess._count.attendance;
+      if (totalMarked > 0) {
+        const attended = sess.attendance.length;
+        const locationPlayers = sess.location_id ? locationPlayerCounts[sess.location_id] || 0 : 0;
+        const denominator = Math.max(locationPlayers, totalMarked);
+        if (denominator > 0) {
+          totalPercentSum += Math.round((attended / denominator) * 100);
+          evaluatedSessions++;
         }
       }
-
-      if (evaluatedSessions > 0) {
-        monthlyAttendancePercent = Math.round(totalPercentSum / evaluatedSessions);
-      }
     }
-  } catch (e) {
-    console.error("Monthly attendance fetch failed", e);
+
+    if (evaluatedSessions > 0) {
+      monthlyAttendancePercent = Math.round(totalPercentSum / evaluatedSessions);
+    }
   }
 
   function getAttendanceMetric(percentage: number) {
@@ -177,102 +153,87 @@ export async function HomeTab() {
   }
 
   const monthlyMetric = getAttendanceMetric(monthlyAttendancePercent);
+  const activePlayersCount = activePlayersCountRes.status === 'fulfilled' ? activePlayersCountRes.value : 0;
 
-  // Active players KPI (count of active players who have attended 1+ sessions)
-  let activePlayersCount = 0;
-  try {
-    activePlayersCount = await prisma.player.count({
+  return (
+    <KpiCardsGrid
+      totalPlayers={totalPlayers}
+      trendPercent={trendPercent}
+      monthlyAttendancePercent={monthlyAttendancePercent}
+      monthlyMetric={monthlyMetric}
+      activePlayersCount={activePlayersCount}
+    />
+  );
+}
+
+async function WeeklyAttendanceSection() {
+  const now = new Date();
+  const dayOfWeek = now.getDay() || 7;
+  const startOfWeek = new Date(now);
+  startOfWeek.setDate(now.getDate() - dayOfWeek + 1);
+  startOfWeek.setHours(0, 0, 0, 0);
+  const endOfWeek = new Date(startOfWeek);
+  endOfWeek.setDate(startOfWeek.getDate() + 6);
+  endOfWeek.setHours(23, 59, 59, 999);
+
+  const [locations, locationPlayerCounts, weeklyAttendances, totalPlayers] = await Promise.all([
+    getActiveLocationsCached(),
+    getActivePlayerCountsCached(),
+    prisma.attendance.findMany({
       where: {
-        is_active: true,
-        attendance: {
-          some: {
-            status: { in: ['PRESENT', 'LATE'] },
-          },
-        },
+        marked_at: { gte: startOfWeek, lte: endOfWeek },
+        status: { in: ['PRESENT', 'LATE'] },
       },
-    });
-  } catch (e) {
-    console.error("Active players fetch failed", e);
-  }
+      select: {
+        player_id: true,
+        marked_at: true,
+        session: { select: { location_id: true } },
+      },
+    }),
+    prisma.player.count({ where: { is_active: true } }),
+  ]);
 
-  // Upcoming session (fetches strictly the first future scheduled session for HomeTab)
-  let nextCoachingSessionsData: {
-    id: string;
-    locationName: string;
-    coachName: string;
-    scheduledAtText: string;
-    totalPlayers: number;
-    sessionDateText: string;
-  }[] = [];
-  let hasMoreUpcomingSessions = false;
+  return (
+    <WeeklyAttendanceChart
+      locations={locations}
+      locationPlayerCounts={locationPlayerCounts}
+      weeklyAttendances={weeklyAttendances}
+      totalPlayers={totalPlayers}
+    />
+  );
+}
 
-  try {
-    const futureCount = await prisma.session.count({
-      where: { start_time: { gt: now } },
-    });
-    hasMoreUpcomingSessions = futureCount >= 2;
+async function QuickActionsSection() {
+  const locations = await getActiveLocationsCached();
+  return <QuickActions locations={locations} />;
+}
 
-    const firstFutureSession = await prisma.session.findFirst({
-      where: { start_time: { gt: now } },
-      orderBy: { start_time: 'asc' },
+async function PastSessionSection() {
+  const now = new Date();
+  const [pastCount, pastSession, locationPlayerCounts] = await Promise.all([
+    prisma.session.count({
+      where: {
+        OR: [{ start_time: { lte: now } }, { attendance: { some: {} } }],
+      },
+    }),
+    prisma.session.findFirst({
+      where: {
+        OR: [{ start_time: { lte: now } }, { attendance: { some: {} } }],
+      },
+      orderBy: { start_time: 'desc' },
       select: {
         id: true,
         start_time: true,
-        location: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-        coach: {
-          select: {
-            first_name: true,
-            last_name: true,
-          },
-        },
+        location: { select: { id: true, name: true } },
+        coach: { select: { first_name: true, last_name: true } },
+        attendance: { select: { id: true, status: true, marked_at: true } },
       },
-    });
+    }),
+    getActivePlayerCountsCached(),
+  ]);
 
-    if (firstFutureSession) {
-      let locationTotalPlayers = 0;
-      if (firstFutureSession.location?.id) {
-        locationTotalPlayers = await prisma.player.count({
-          where: {
-            location_id: firstFutureSession.location.id,
-            is_active: true,
-          },
-        });
-      }
+  const hasMorePastSessions = pastCount >= 2;
 
-      const scheduledAtText = firstFutureSession.start_time.toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-
-      const sessionDateText = firstFutureSession.start_time.toLocaleDateString([], {
-        weekday: 'short',
-        month: 'short',
-        day: 'numeric',
-      });
-
-      const coachName = firstFutureSession.coach
-        ? `${firstFutureSession.coach.first_name} ${firstFutureSession.coach.last_name}`.trim()
-        : 'Unassigned';
-
-      nextCoachingSessionsData.push({
-        id: firstFutureSession.id,
-        locationName: firstFutureSession.location?.name || 'Unknown Location',
-        coachName,
-        scheduledAtText,
-        totalPlayers: locationTotalPlayers,
-        sessionDateText,
-      });
-    }
-  } catch (e) {
-    console.error("Upcoming session fetch failed", e);
-  }
-
-  // Fetch latest past session conducted (strictly 1 record for HomeTab)
   let latestPastSessionData: {
     locationName: string;
     coachName: string;
@@ -281,166 +242,169 @@ export async function HomeTab() {
     totalPlayers: number;
     sessionDateText: string;
   } | null = null;
-  let hasMorePastSessions = false;
 
-  try {
-    const pastCount = await prisma.session.count({
-      where: { start_time: { lte: now } },
-    });
-    hasMorePastSessions = pastCount >= 2;
+  if (pastSession) {
+    const locationTotalPlayers = pastSession.location?.id
+      ? (locationPlayerCounts[pastSession.location.id] || 0)
+      : 0;
 
-    const pastSession = await prisma.session.findFirst({
-      where: { start_time: { lte: now } },
-      orderBy: { start_time: 'desc' },
-      select: {
-        id: true,
-        start_time: true,
-        location: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-        coach: {
-          select: {
-            first_name: true,
-            last_name: true,
-          },
-        },
-        attendance: {
-          select: {
-            id: true,
-            status: true,
-            marked_at: true,
-          },
-        },
-      },
-    });
+    const attendedCount = pastSession.attendance.filter(
+      (a) => a.status === 'PRESENT' || a.status === 'LATE'
+    ).length;
 
-    if (pastSession) {
-      let locationTotalPlayers = 0;
-      if (pastSession.location?.id) {
-        locationTotalPlayers = await prisma.player.count({
-          where: {
-            location_id: pastSession.location.id,
-            is_active: true,
-          },
-        });
+    let latestMarkedAt: Date | null = null;
+    pastSession.attendance.forEach((a) => {
+      if (!latestMarkedAt || a.marked_at > latestMarkedAt) {
+        latestMarkedAt = a.marked_at;
       }
+    });
 
-      const attendedCount = pastSession.attendance.filter(
-        (a) => a.status === 'PRESENT' || a.status === 'LATE'
-      ).length;
+    const markedAtText = latestMarkedAt
+      ? (latestMarkedAt as Date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      : 'Attendance Pending';
 
-      let latestMarkedAt: Date | null = null;
-      pastSession.attendance.forEach((a) => {
-        if (!latestMarkedAt || a.marked_at > latestMarkedAt) {
-          latestMarkedAt = a.marked_at;
-        }
-      });
+    const sessionDateText = pastSession.start_time.toLocaleDateString([], {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+    });
 
-      const markedAtText = latestMarkedAt
-        ? (latestMarkedAt as Date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        : 'Attendance Pending';
+    const coachName = pastSession.coach
+      ? `${pastSession.coach.first_name} ${pastSession.coach.last_name}`.trim()
+      : 'Unassigned';
 
-      const sessionDateText = pastSession.start_time.toLocaleDateString([], {
-        weekday: 'short',
-        month: 'short',
-        day: 'numeric',
-      });
-
-      const coachName = pastSession.coach
-        ? `${pastSession.coach.first_name} ${pastSession.coach.last_name}`.trim()
-        : 'Unassigned';
-
-      latestPastSessionData = {
-        locationName: pastSession.location?.name || 'Unknown Location',
-        coachName,
-        markedAtText,
-        attendedCount,
-        totalPlayers: Math.max(locationTotalPlayers, pastSession.attendance.length),
-        sessionDateText,
-      };
-    }
-  } catch (e) {
-    console.error("Latest past session fetch failed", e);
+    latestPastSessionData = {
+      locationName: pastSession.location?.name || 'Unknown Location',
+      coachName,
+      markedAtText,
+      attendedCount,
+      totalPlayers: Math.max(locationTotalPlayers, pastSession.attendance.length),
+      sessionDateText,
+    };
   }
 
   return (
-    <>
-      {/* KPI Cards Grid */}
-      <KpiCardsGrid
-        totalPlayers={totalPlayers}
-        trendPercent={trendPercent}
-        monthlyAttendancePercent={monthlyAttendancePercent}
-        monthlyMetric={monthlyMetric}
-        activePlayersCount={activePlayersCount}
-      />
-
-      <WeeklyAttendanceChart
-        locations={locations}
-        locationPlayerCounts={locationPlayerCounts}
-        weeklyAttendances={weeklyAttendances}
-        totalPlayers={totalPlayers}
-      />
-
-      {/* Quick Actions Integration */}
-      <QuickActions locations={locations} />
-
-      {/* Past Session Section */}
-      <section className="space-y-3">
-        <div className="flex justify-between items-center px-1">
-          <h2 className="text-lg font-bold text-slate-900">Past Session</h2>
-          {hasMorePastSessions && (
-            <Link href="/admin/sessions/past" className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors">
-              View All
-            </Link>
-          )}
+    <section className="space-y-3">
+      <div className="flex justify-between items-center px-1">
+        <h2 className="text-lg font-bold text-slate-900">Past Session</h2>
+        {hasMorePastSessions && (
+          <Link
+            href="/admin/sessions/past"
+            className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors"
+          >
+            View All
+          </Link>
+        )}
+      </div>
+      {latestPastSessionData ? (
+        <PastSessionCard
+          locationName={latestPastSessionData.locationName}
+          coachName={latestPastSessionData.coachName}
+          markedAtText={latestPastSessionData.markedAtText}
+          attendedCount={latestPastSessionData.attendedCount}
+          totalPlayers={latestPastSessionData.totalPlayers}
+          sessionDateText={latestPastSessionData.sessionDateText}
+        />
+      ) : (
+        <div className="bg-white rounded-2xl p-5 border border-slate-100 text-center text-slate-500 text-xs font-medium">
+          No past sessions conducted yet.
         </div>
-        {latestPastSessionData ? (
-          <PastSessionCard
-            locationName={latestPastSessionData.locationName}
-            coachName={latestPastSessionData.coachName}
-            markedAtText={latestPastSessionData.markedAtText}
-            attendedCount={latestPastSessionData.attendedCount}
-            totalPlayers={latestPastSessionData.totalPlayers}
-            sessionDateText={latestPastSessionData.sessionDateText}
+      )}
+    </section>
+  );
+}
+
+async function UpcomingSessionsSection() {
+  const now = new Date();
+  const [futureCount, firstFutureSession, locationPlayerCounts] = await Promise.all([
+    prisma.session.count({
+      where: { start_time: { gt: now }, attendance: { none: {} } },
+    }),
+    prisma.session.findFirst({
+      where: { start_time: { gt: now }, attendance: { none: {} } },
+      orderBy: { start_time: 'asc' },
+      select: {
+        id: true,
+        start_time: true,
+        location: { select: { id: true, name: true } },
+        coach: { select: { first_name: true, last_name: true } },
+      },
+    }),
+    getActivePlayerCountsCached(),
+  ]);
+
+  const hasMoreUpcomingSessions = futureCount >= 2;
+  let nextCoachingSessionsData: {
+    id: string;
+    locationName: string;
+    coachName: string;
+    scheduledAtText: string;
+    totalPlayers: number;
+    sessionDateText: string;
+  }[] = [];
+
+  if (firstFutureSession) {
+    const locationTotalPlayers = firstFutureSession.location?.id
+      ? (locationPlayerCounts[firstFutureSession.location.id] || 0)
+      : 0;
+
+    const scheduledAtText = firstFutureSession.start_time.toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+
+    const sessionDateText = firstFutureSession.start_time.toLocaleDateString([], {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+    });
+
+    const coachName = firstFutureSession.coach
+      ? `${firstFutureSession.coach.first_name} ${firstFutureSession.coach.last_name}`.trim()
+      : 'Unassigned';
+
+    nextCoachingSessionsData.push({
+      id: firstFutureSession.id,
+      locationName: firstFutureSession.location?.name || 'Unknown Location',
+      coachName,
+      scheduledAtText,
+      totalPlayers: locationTotalPlayers,
+      sessionDateText,
+    });
+  }
+
+  return (
+    <section className="space-y-3">
+      <div className="flex justify-between items-center px-1">
+        <h2 className="text-lg font-bold text-slate-900">Upcoming Sessions</h2>
+        {hasMoreUpcomingSessions && (
+          <Link
+            href="/admin/sessions/upcoming"
+            className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors"
+          >
+            View All
+          </Link>
+        )}
+      </div>
+      {nextCoachingSessionsData.length > 0 ? (
+        nextCoachingSessionsData.map((session) => (
+          <UpcomingSessionCard
+            key={session.id}
+            locationName={session.locationName}
+            coachName={session.coachName}
+            scheduledAtText={session.scheduledAtText}
+            totalPlayers={session.totalPlayers}
+            sessionDateText={session.sessionDateText}
           />
-        ) : (
-          <div className="bg-white rounded-2xl p-5 border border-slate-100 text-center text-slate-500 text-xs font-medium">
-            No past sessions conducted yet.
-          </div>
-        )}
-      </section>
-
-      {/* Upcoming Sessions Section */}
-      <section className="space-y-3">
-        <div className="flex justify-between items-center px-1">
-          <h2 className="text-lg font-bold text-slate-900">Upcoming Sessions</h2>
-          {hasMoreUpcomingSessions && (
-            <Link href="/admin/sessions/upcoming" className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors">
-              View All
-            </Link>
-          )}
-        </div>
-        {nextCoachingSessionsData.length > 0 ? (
-          nextCoachingSessionsData.map((session) => (
-            <UpcomingSessionCard
-              key={session.id}
-              locationName={session.locationName}
-              coachName={session.coachName}
-              scheduledAtText={session.scheduledAtText}
-              totalPlayers={session.totalPlayers}
-              sessionDateText={session.sessionDateText}
-            />
-          ))
-        ) : (
-          <section className="bg-slate-900 rounded-2xl p-5 shadow-md relative overflow-hidden min-h-[140px] flex flex-col justify-center items-center text-center">
-            <span className="material-symbols-outlined text-[40px] text-slate-700 mb-1">event_available</span>
-            <h3 className="text-xs font-bold text-slate-400">No upcoming sessions scheduled</h3>
-          </section>
-        )}
-      </section>
-    </>
-  )
+        ))
+      ) : (
+        <section className="bg-slate-900 rounded-2xl p-5 shadow-md relative overflow-hidden min-h-[140px] flex flex-col justify-center items-center text-center">
+          <span className="material-symbols-outlined text-[40px] text-slate-700 mb-1">
+            event_available
+          </span>
+          <h3 className="text-xs font-bold text-slate-400">No upcoming sessions scheduled</h3>
+        </section>
+      )}
+    </section>
+  );
 }

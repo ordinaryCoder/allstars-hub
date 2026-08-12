@@ -1,4 +1,3 @@
-import { createClient } from '@/lib/server'
 import { redirect } from 'next/navigation'
 import { requireRole } from '@/lib/dal'
 import { prisma } from '@packages/database'
@@ -16,14 +15,11 @@ export default async function AdminPage({
   const params = await searchParams
   const tab = params?.tab || 'home'
 
-  const supabase = await createClient()
-  const { data: { user }, error } = await supabase.auth.getUser()
-
-  if (error || !user) {
-    redirect('/login')
+  if (tab === 'create-session' || tab === 'schedule') {
+    redirect('/admin/create-session')
   }
 
-  await requireRole(user.id, 'admin')
+  const user = await requireRole('admin')
 
   const dbUser = await prisma.user.findUnique({
     where: { id: user.id },

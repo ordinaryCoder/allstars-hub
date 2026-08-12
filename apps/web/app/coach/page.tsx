@@ -1,24 +1,12 @@
-import { createClient } from '../../lib/server';
-import { redirect } from 'next/navigation';
-import { requireRole } from '../../lib/dal';
-import { ACADEMY_NAME } from '@/lib/constant';
+import { requireRole } from '@/lib/dal';
 import { TodaySessions } from './_components/TodaySessions';
 import { prisma } from '@packages/database';
-import { PerformanceTrack } from './_components/PerformanceTrack';
 import { signOut } from '@/app/(auth)/_actions/auth';
 import { TopAppBar } from '@/components/layout/TopAppBar';
 import { CoachBottomNav } from '@/components/layout/CoachBottomNav';
 
 export default async function DashboardPage() {
-  const supabase = await createClient();
-  const { data: { user }, error } = await supabase.auth.getUser();
-
-  // TODO: cleanup logic
-  if (error || !user) {
-    redirect('/login');
-  }
-
-  await requireRole(user.id, 'coach');
+  const user = await requireRole('coach');
 
   const userName = user.email?.split('@')[0] || 'Coach';
 
@@ -29,20 +17,34 @@ export default async function DashboardPage() {
 
   const todaySessions = await prisma.session.findMany({
     where: {
-      created_by: user.id,
       start_time: {
         gte: today,
         lt: tomorrow,
       },
+      OR: [
+        { coach_id: user.id },
+        { created_by: user.id },
+        {
+          coach_id: null,
+          location: {
+            coachLocations: {
+              some: { user_id: user.id },
+            },
+          },
+        },
+      ],
     },
     include: {
       location: true,
+      attendance: { select: { id: true } },
     },
     orderBy: { start_time: 'asc' },
   });
   
   const now = new Date();
-  const futureSessionsCount = todaySessions.filter(s => new Date(s.start_time) > now).length;
+  const futureSessionsCount = todaySessions.filter(
+    (s) => new Date(s.start_time) > now && s.attendance.length === 0
+  ).length;
 
   return (
     <>

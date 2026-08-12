@@ -31,12 +31,13 @@ export async function saveAttendance(payload: {
       // 1. Scheduled Session (pre-created by Admin or Scheduler with location and coach)
       const existingSession = await prisma.session.findUnique({
         where: { id: sessionId },
-        select: { id: true, academy_id: true, location_id: true, coach_id: true, created_by: true }
+        select: { id: true, academy_id: true, location_id: true, coach_id: true, created_by: true, end_time: true }
       });
       if (!existingSession) throw new Error('Scheduled session not found');
 
       const targetSessionId = existingSession.id;
       const academyId = existingSession.academy_id;
+      const now = new Date();
 
       // Collect all player rows to insert
       const allPlayers: { id: string }[] = [];
@@ -62,9 +63,18 @@ export async function saveAttendance(payload: {
         };
       });
 
-      if (rows.length > 0) {
-        await prisma.attendance.createMany({ data: rows });
-      }
+      await prisma.$transaction(async (tx) => {
+        if (now <= existingSession.end_time) {
+          await tx.session.update({
+            where: { id: targetSessionId },
+            data: { end_time: now },
+          });
+        }
+
+        if (rows.length > 0) {
+          await tx.attendance.createMany({ data: rows, skipDuplicates: true });
+        }
+      });
 
       return { ok: true, sessionId: targetSessionId };
     } else {
@@ -161,7 +171,7 @@ export async function saveAttendance(payload: {
         });
 
         if (rows.length > 0) {
-          await tx.attendance.createMany({ data: rows });
+          await tx.attendance.createMany({ data: rows, skipDuplicates: true });
         }
 
         return { ok: true, sessionId: newSession.id };

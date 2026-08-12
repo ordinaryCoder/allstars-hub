@@ -1,37 +1,14 @@
 import { TopAppBar } from '@/components/layout/TopAppBar';
 import { BottomNav } from '@/components/layout/BottomNav';
-import { createClient } from '@/lib/server';
-import { redirect } from 'next/navigation';
 import { requireRole } from '@/lib/dal';
-import { prisma } from '@packages/database';
+import { getUserProfileDataCached } from '@/lib/cached-queries';
 import { signOut } from '@/app/(auth)/_actions/auth';
 import { ChangePasswordButton } from '@/components/ui/ChangePasswordButton';
 
 export default async function PlayerProfilePage() {
-  const supabase = await createClient();
-  const { data: { user }, error } = await supabase.auth.getUser();
+  const user = await requireRole(['player', 'parent']);
 
-  if (error || !user) {
-    redirect('/login');
-  }
-
-  await requireRole(user.id, ['player', 'parent']);
-
-  // Fetch db user and linked player records
-  const dbUser = await prisma.user.findUnique({ where: { id: user.id } });
-  const player = await prisma.player.findFirst({
-    where: {
-      OR: [
-        { user_id: user.id },
-        { parents: { some: { parent_user_id: user.id } } }
-      ]
-    },
-    include: {
-      parents: {
-        include: { parent: true }
-      }
-    }
-  });
+  const { dbUser, player } = await getUserProfileDataCached(user.id);
 
   const userName = player ? `${player.first_name} ${player.last_name}` : dbUser?.first_name ? `${dbUser.first_name} ${dbUser.last_name}` : 'Player';
   const initials = userName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase();

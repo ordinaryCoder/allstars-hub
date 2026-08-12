@@ -1,38 +1,14 @@
-import { createClient } from '@/lib/server';
-import { redirect } from 'next/navigation';
 import { requireRole } from '@/lib/dal';
-import { prisma } from '@packages/database';
+import { getUserProfileDataCached } from '@/lib/cached-queries';
 import { signOut } from '@/app/(auth)/_actions/auth';
 import { CoachBottomNav } from '@/components/layout/CoachBottomNav';
 import { ACADEMY_NAME } from '@/lib/constant';
 import { ChangePasswordButton } from '@/components/ui/ChangePasswordButton';
 
 export default async function CoachProfilePage() {
-  const supabase = await createClient();
-  const { data: { user }, error } = await supabase.auth.getUser();
+  const user = await requireRole('coach');
 
-  if (error || !user) {
-    redirect('/login');
-  }
-
-  await requireRole(user.id, 'coach');
-
-  // Fetch coach user & locations from database
-  const dbUser = await prisma.user.findUnique({
-    where: { id: user.id },
-    include: {
-      coachLocations: {
-        include: {
-          location: true,
-        },
-      },
-      academy_roles: {
-        include: {
-          academy: true,
-        },
-      },
-    },
-  });
+  const { dbUser, totalSessions, activePlayersCount } = await getUserProfileDataCached(user.id);
 
   const coachName = dbUser?.first_name && dbUser?.last_name
     ? `${dbUser.first_name} ${dbUser.last_name}`
@@ -44,28 +20,6 @@ export default async function CoachProfilePage() {
     .join('')
     .substring(0, 2)
     .toUpperCase();
-
-  // Fetch total sessions coached/created by this coach
-  const totalSessions = await prisma.session.count({
-    where: {
-      OR: [
-        { created_by: user.id },
-        { coach_id: user.id },
-      ],
-    },
-  });
-
-  // Fetch count of active players across coach's assigned locations
-  const activePlayersCount = await prisma.player.count({
-    where: {
-      is_active: true,
-      location: {
-        coachLocations: {
-          some: { user_id: user.id },
-        },
-      },
-    },
-  });
 
   const assignedLocations = dbUser?.coachLocations.map((cl) => cl.location) || [];
 

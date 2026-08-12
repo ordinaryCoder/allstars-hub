@@ -1,9 +1,9 @@
-export function AttendanceHealth({ stats }: { stats: { percentage: number; attended: number; missed: number; total: number } }) {
+export function AttendanceStats({ stats }: { stats: { percentage: number; attended: number; missed: number; total: number } }) {
   const dashOffset = 263.89 - (263.89 * stats.percentage) / 100;
 
   return (
     <section className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-      <p className="text-slate-600 text-xs font-semibold mb-4 uppercase tracking-wider">Attendance Health</p>
+      <p className="text-slate-600 text-xs font-semibold mb-4 uppercase tracking-wider">Attendance Stats</p>
       <div className="flex items-center gap-8">
         <div className="relative flex items-center justify-center">
           <svg className="w-24 h-24 transform -rotate-90">
