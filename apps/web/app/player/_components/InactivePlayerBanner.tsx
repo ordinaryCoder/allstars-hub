@@ -6,11 +6,11 @@ export function InactivePlayerBanner({ playerName }: { playerName: string }) {
       </div>
       <div className="flex-1 min-w-0">
         <h3 className="text-sm font-bold text-amber-950 flex items-center gap-1.5">
-          <span>Account Inactive</span>
+          <span>Player Inactive</span>
           <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500"></span>
         </h3>
         <p className="text-xs text-amber-800/90 mt-1 leading-relaxed">
-          <strong className="font-semibold text-amber-900">{playerName}</strong> is currently deactivated. Please contact academy management to request account reactivation.
+          <strong className="font-semibold text-amber-900">{playerName}</strong> is currently unable to attend training. Please contact academy management to request account reactivation.
         </p>
       </div>
     </div>
