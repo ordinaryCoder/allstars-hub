@@ -25,10 +25,11 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
+      { url: "/icons/icon-192x192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/logo-512x512.png", sizes: "512x512", type: "image/png" },
       { url: "/icons/allstars-favicon.svg", type: "image/svg+xml" },
-      { url: "/favicon.ico" },
     ],
-    shortcut: "/icons/allstars-favicon.svg",
+    shortcut: "/icons/icon-192x192.png",
     apple: "/icons/apple-icon.png",
   },
 };
@@ -51,10 +52,14 @@ export default function RootLayout({
         />
         <link
           rel="icon"
-          href="/icons/allstars-favicon.svg"
-          type="image/svg+xml"
+          href="/icons/icon-192x192.png"
+          type="image/png"
+          sizes="192x192"
         />
-        <link rel="shortcut icon" href="/icons/allstars-favicon.svg" />
+        <link
+          rel="apple-touch-icon"
+          href="/icons/apple-icon.png"
+        />
       </head>
       <body className="min-h-full flex flex-col font-sans">
         <SnackbarProvider>{children}</SnackbarProvider>

@@ -6,16 +6,12 @@ export default function manifest(): MetadataRoute.Manifest {
     short_name: "AllStars",
     description: "Comprehensive Sports Academy Management Platform",
     start_url: "/",
+    scope: "/",
+    id: "/",
     display: "standalone",
     background_color: "#ffffff",
     theme_color: "#0f172a",
     icons: [
-      {
-        src: "/icons/allstars-favicon.svg",
-        sizes: "any",
-        type: "image/svg+xml",
-        purpose: "any",
-      },
       {
         src: "/icons/icon-192x192.png",
         sizes: "192x192",
@@ -33,6 +29,12 @@ export default function manifest(): MetadataRoute.Manifest {
         sizes: "512x512",
         type: "image/png",
         purpose: "maskable",
+      },
+      {
+        src: "/icons/allstars-favicon.svg",
+        sizes: "any",
+        type: "image/svg+xml",
+        purpose: "any",
       },
     ],
   };
