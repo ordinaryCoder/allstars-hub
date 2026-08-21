@@ -48,7 +48,6 @@ export default function manifest(): MetadataRoute.Manifest {
         src: "/icons/screenshot-mobile.png",
         sizes: "390x844",
         type: "image/png",
-        // @ts-expect-error — form_factor is valid in the spec but not yet in Next.js types
         form_factor: "narrow",
         label: "AllStars Hub – Mobile",
       },
@@ -56,7 +55,6 @@ export default function manifest(): MetadataRoute.Manifest {
         src: "/icons/screenshot-desktop.png",
         sizes: "1280x720",
         type: "image/png",
-        // @ts-expect-error — form_factor is valid in the spec but not yet in Next.js types
         form_factor: "wide",
         label: "AllStars Hub – Desktop",
       },
