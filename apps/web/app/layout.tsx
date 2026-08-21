@@ -26,12 +26,14 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: "/icons/icon-192x192.png", sizes: "192x192", type: "image/png" },
-      { url: "/icons/logo-512x512.png", sizes: "512x512", type: "image/png" },
       { url: "/icons/allstars-favicon.svg", type: "image/svg+xml" },
+      { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+      { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
     ],
-    shortcut: "/icons/icon-192x192.png",
-    apple: "/icons/apple-icon.png",
+    shortcut: "/favicon.ico",
+    apple: [
+      { url: "/icons/apple-icon.png", sizes: "180x180", type: "image/png" },
+    ],
   },
 };
 
@@ -50,16 +52,6 @@ export default function RootLayout({
         <link
           rel="stylesheet"
           href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
-        />
-        <link
-          rel="icon"
-          href="/icons/icon-192x192.png"
-          type="image/png"
-          sizes="192x192"
-        />
-        <link
-          rel="apple-touch-icon"
-          href="/icons/apple-icon.png"
         />
       </head>
       <body className="min-h-full flex flex-col font-sans">

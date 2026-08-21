@@ -16,20 +16,14 @@ export default function manifest(): MetadataRoute.Manifest {
     prefer_related_applications: false,
     categories: ["sports", "education", "productivity"],
     icons: [
-      // Regular (any) icons — no safe-zone padding required
+      // SVG — scales perfectly at any resolution
       {
-        src: "/icons/icon-192x192.png",
-        sizes: "192x192",
-        type: "image/png",
+        src: "/icons/allstars-favicon.svg",
+        sizes: "any",
+        type: "image/svg+xml",
         purpose: "any",
       },
-      {
-        src: "/icons/logo-512x512.png",
-        sizes: "512x512",
-        type: "image/png",
-        purpose: "any",
-      },
-      // Maskable icons — content within 80% safe zone (required for Android adaptive icons)
+      // Maskable — content within 80% safe zone for Android adaptive icon shapes
       {
         src: "/icons/maskable-icon-192x192.png",
         sizes: "192x192",
@@ -46,7 +40,7 @@ export default function manifest(): MetadataRoute.Manifest {
     screenshots: [
       {
         src: "/icons/screenshot-mobile.png",
-        sizes: "390x844",
+        sizes: "720x1468",
         type: "image/png",
         form_factor: "narrow",
         label: "AllStars Hub – Mobile",
