@@ -7,11 +7,16 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "Comprehensive Sports Academy Management Platform",
     start_url: "/",
     scope: "/",
-    id: "/",
+    id: "/?source=pwa",
     display: "standalone",
-    background_color: "#ffffff",
+    display_override: ["standalone", "minimal-ui", "browser"],
+    background_color: "#0f172a",
     theme_color: "#0f172a",
+    orientation: "portrait-primary",
+    prefer_related_applications: false,
+    categories: ["sports", "education", "productivity"],
     icons: [
+      // Regular (any) icons — no safe-zone padding required
       {
         src: "/icons/icon-192x192.png",
         sizes: "192x192",
@@ -24,17 +29,36 @@ export default function manifest(): MetadataRoute.Manifest {
         type: "image/png",
         purpose: "any",
       },
+      // Maskable icons — content within 80% safe zone (required for Android adaptive icons)
       {
-        src: "/icons/logo-512x512.png",
-        sizes: "512x512",
+        src: "/icons/maskable-icon-192x192.png",
+        sizes: "192x192",
         type: "image/png",
         purpose: "maskable",
       },
       {
-        src: "/icons/allstars-favicon.svg",
-        sizes: "any",
-        type: "image/svg+xml",
-        purpose: "any",
+        src: "/icons/maskable-icon-512x512.png",
+        sizes: "512x512",
+        type: "image/png",
+        purpose: "maskable",
+      },
+    ],
+    screenshots: [
+      {
+        src: "/icons/screenshot-mobile.png",
+        sizes: "390x844",
+        type: "image/png",
+        // @ts-expect-error — form_factor is valid in the spec but not yet in Next.js types
+        form_factor: "narrow",
+        label: "AllStars Hub – Mobile",
+      },
+      {
+        src: "/icons/screenshot-desktop.png",
+        sizes: "1280x720",
+        type: "image/png",
+        // @ts-expect-error — form_factor is valid in the spec but not yet in Next.js types
+        form_factor: "wide",
+        label: "AllStars Hub – Desktop",
       },
     ],
   };
