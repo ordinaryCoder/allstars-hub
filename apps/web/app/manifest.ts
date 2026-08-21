@@ -16,11 +16,11 @@ export default function manifest(): MetadataRoute.Manifest {
     prefer_related_applications: false,
     categories: ["sports", "education", "productivity"],
     icons: [
-      // SVG — scales perfectly at any resolution
+      // Full logo — used for PWA launcher icon display (no clipping constraints)
       {
-        src: "/icons/allstars-favicon.svg",
-        sizes: "any",
-        type: "image/svg+xml",
+        src: "/icons/all-stars-hi-res.jpg",
+        sizes: "512x512",
+        type: "image/jpeg",
         purpose: "any",
       },
       // Maskable — content within 80% safe zone for Android adaptive icon shapes

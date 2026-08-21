@@ -1,5 +1,5 @@
 import Image from 'next/image';
-import logoImg from '@/public/icons/logo-512x512.png';
+import logoImg from '@/public/icons/all-stars-hi-res.jpg';
 
 interface AcademyLogoProps {
   className?: string;
