@@ -17,6 +17,7 @@ export default async function HomePage() {
   });
 
   if (!dbUser) {
+    await supabase.auth.signOut();
     redirect('/login');
   }
 

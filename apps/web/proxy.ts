@@ -37,26 +37,32 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
 
   const pathname = request.nextUrl.pathname;
   const isAuthPage = pathname.startsWith('/login') || pathname.startsWith('/signup');
-  const isPublicPage =
-    isAuthPage ||
+  const isStaticPublicAsset =
     pathname.startsWith('/contactus') ||
     pathname.startsWith('/pending') ||
-    pathname.startsWith('/confirm-email');
+    pathname.startsWith('/confirm-email') ||
+    pathname.startsWith('/manifest') ||
+    pathname.startsWith('/icons') ||
+    pathname.startsWith('/sw.js') ||
+    pathname.startsWith('/~offline');
+
+  // Fast path for non-auth public pages & assets
+  if (isStaticPublicAsset) {
+    return supabaseResponse;
+  }
 
   const hasAuthCookie = request.cookies.getAll().some((c) => c.name.startsWith('sb-'));
 
-  // If user visits /login or /signup while ALREADY logged in, auto-redirect to dashboard
-  if (isAuthPage && hasAuthCookie) {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const url = request.nextUrl.clone();
-      url.pathname = '/';
-      return NextResponse.redirect(url);
+  // If an already logged-in user visits /login or /signup, redirect them to dashboard (via /)
+  if (isAuthPage) {
+    if (hasAuthCookie) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const url = request.nextUrl.clone();
+        url.pathname = '/';
+        return NextResponse.redirect(url);
+      }
     }
-  }
-
-  // Fast path for guests on public routes (0ms network delay)
-  if (isPublicPage) {
     return supabaseResponse;
   }
 
@@ -81,13 +87,8 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
 export const config: MiddlewareConfig = {
   matcher: [
     /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - api (API routes)
-     * - auth (auth routes)
+     * Match all request paths except for static files, API, PWA assets, and icons
      */
-    '/((?!_next/static|_next/image|favicon.ico|api|auth).*)',
+    '/((?!_next/static|_next/image|favicon.ico|api|auth|sw.js|manifest|icons|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }

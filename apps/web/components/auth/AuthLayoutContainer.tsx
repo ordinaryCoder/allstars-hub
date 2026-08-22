@@ -26,8 +26,8 @@ export function AuthLayoutContainer({
 
       {/* Top Area: Academy Logo Header */}
       <header className="w-full max-w-md mb-8 flex flex-col items-center justify-center text-center">
-        <div className="h-12 w-12 bg-gray-200 rounded-full mb-4 flex items-center justify-center overflow-hidden">
-          <AcademyLogo className="w-6 h-6 text-gray-600" />
+        <div className="mb-4 flex items-center justify-center">
+          <AcademyLogo className="w-20 h-20" />
         </div>
         <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
         <p className="text-sm text-gray-600 mt-2">{subtitle}</p>

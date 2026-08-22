@@ -1,13 +1,13 @@
 import Link from 'next/link';
 import { signOut } from '@/app/(auth)/_actions/auth';
 
-export default function UnauthorizedPage({
+export default async function UnauthorizedPage({
   searchParams,
 }: {
-  searchParams: {email?: string} | null;
+  searchParams: Promise<{ email?: string }>;
 }) {
-  const resolvedParams: string | undefined = searchParams?.email;
-  const email: string | undefined = resolvedParams;
+  const resolvedParams = await searchParams;
+  const email: string | undefined = resolvedParams?.email;
 
   return (
     <>

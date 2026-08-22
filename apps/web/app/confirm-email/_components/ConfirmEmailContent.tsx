@@ -53,9 +53,7 @@ export default function ConfirmEmailContent({ userEmail }: { userEmail?: string 
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4">
       <div className="w-full max-w-md bg-white shadow-xl border border-black/10 rounded-2xl p-8 text-center">
         <div className="flex justify-center mb-6">
-          <div className="h-12 w-12 bg-gray-200 rounded-full flex items-center justify-center overflow-hidden">
-            <AcademyLogo className="w-6 h-6 text-gray-600" />
-          </div>
+          <AcademyLogo className="w-20 h-20" />
         </div>
         <h1 className="text-2xl font-bold text-gray-900 mb-4">
           Please Confirm Your Email

@@ -23,7 +23,7 @@ export default function LoginPage() {
 
   return (
     <AuthLayoutContainer
-      title="Academy Attendance"
+      title="AllStars Attendance"
       subtitle="Log in to manage attendance and records"
       pending={pending}
     >
