@@ -6,15 +6,9 @@ import { DobInput } from '@/components/form/DobInput';
 import { useSnackbar } from '@/components/ui/Snackbar';
 import { Spinner } from '@/components/ui/Loading';
 import {
-  validateSignupData,
+  validateAdminPlayerData,
   normalizeIndianMobile,
-  type SignupInputData,
 } from '@/lib/validations/signup';
-import {
-  DEFAULT_PRESET_PASSWORD,
-  generateRandomPassword,
-} from '@/lib/constants/auth';
-import type { CreatedCredentials } from './CredentialSuccessModal';
 
 export interface LocationOption {
   id: string;
@@ -23,23 +17,19 @@ export interface LocationOption {
 
 interface AddPlayerModalProps {
   locations: LocationOption[];
-  onSuccess: (credentials: CreatedCredentials) => void;
+  onClose?: () => void;
+  onSuccess?: () => void;
 }
 
-export function AddPlayerModal({ locations, onSuccess }: AddPlayerModalProps) {
-  const [role, setRole] = useState('parent');
-  const [guardianName, setGuardianName] = useState('');
+export function AddPlayerModal({ locations, onClose, onSuccess }: AddPlayerModalProps) {
   const [playerFirstName, setPlayerFirstName] = useState('');
   const [playerLastName, setPlayerLastName] = useState('');
-  const [playerEmail, setPlayerEmail] = useState('');
   const [playerMobile, setPlayerMobile] = useState('');
   const [playerLocationId, setPlayerLocationId] = useState('');
+  const [playerEmail, setPlayerEmail] = useState('');
   const [dob, setDob] = useState('');
 
-  const [customPassword, setCustomPassword] = useState(DEFAULT_PRESET_PASSWORD);
-  const [showPasswordText, setShowPasswordText] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
   const [isPending, startTransition] = useTransition();
   const { showSnackbar } = useSnackbar();
 
@@ -47,36 +37,28 @@ export function AddPlayerModal({ locations, onSuccess }: AddPlayerModalProps) {
     e.preventDefault();
     setError(null);
 
-    const inputData: SignupInputData = {
-      email: playerEmail.trim().toLowerCase(),
+    const mobileClean = normalizeIndianMobile(playerMobile);
+    const validation = validateAdminPlayerData({
       firstName: playerFirstName.trim(),
       lastName: playerLastName.trim(),
-      mobileNumber: normalizeIndianMobile(playerMobile),
-      role,
-      guardianName: guardianName.trim(),
-      dob,
+      mobileNumber: mobileClean,
       locationId: playerLocationId,
-    };
+      email: playerEmail.trim() || undefined,
+      dob: dob,
+    });
 
-    const validation = validateSignupData(inputData, true);
     if (!validation.isValid && validation.error) {
       setError(validation.error);
       return;
     }
 
     const formData = new FormData(e.currentTarget);
-    formData.set('email', inputData.email);
-    formData.set('firstName', inputData.firstName);
-    formData.set('lastName', inputData.lastName);
-    formData.set('mobileNumber', inputData.mobileNumber);
-    formData.set('guardianName', inputData.guardianName ?? '');
-    formData.set('password', customPassword.trim() || DEFAULT_PRESET_PASSWORD);
-
-    const currentRoleName = role === 'player' ? 'Player' : 'Parent';
-    const fullName =
-      role === 'parent'
-        ? `${guardianName} (${playerFirstName} ${playerLastName})`
-        : `${playerFirstName} ${playerLastName}`;
+    formData.set('firstName', playerFirstName.trim());
+    formData.set('lastName', playerLastName.trim());
+    formData.set('mobileNumber', mobileClean);
+    formData.set('locationId', playerLocationId);
+    formData.set('email', playerEmail.trim());
+    formData.set('dob', dob);
 
     startTransition(async () => {
       const res = await addPlayerAdmin(formData);
@@ -84,23 +66,19 @@ export function AddPlayerModal({ locations, onSuccess }: AddPlayerModalProps) {
         setError(res.error);
         showSnackbar({ message: res.error, type: 'error' });
       } else {
-        onSuccess({
-          name: fullName,
-          email: res.email,
-          role: currentRoleName,
-          passwordUsed: res.passwordUsed,
-        });
         showSnackbar({
-          message: `${currentRoleName} registered. Email confirmation link sent to candidate.`,
+          message: `Player ${res.playerName} added successfully`,
           type: 'success',
         });
+        onSuccess?.();
+        onClose?.();
       }
     });
   };
 
   return (
     <>
-      <h3 className="text-xl font-bold text-slate-900 mb-4">Add New Player / Parent</h3>
+      <h3 className="text-xl font-bold text-slate-900 mb-4">Add New Player</h3>
 
       {error && (
         <div
@@ -113,47 +91,10 @@ export function AddPlayerModal({ locations, onSuccess }: AddPlayerModalProps) {
       )}
 
       <form onSubmit={handlePlayerSubmit} className="space-y-4">
-        {/* Parent vs Player Segment Control */}
-        <div className="flex bg-slate-100 p-1 rounded-xl">
-          <button
-            type="button"
-            onClick={() => setRole('parent')}
-            className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${
-              role === 'parent' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            Parent / Guardian
-          </button>
-          <button
-            type="button"
-            onClick={() => setRole('player')}
-            className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${
-              role === 'player' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            Player Only
-          </button>
-        </div>
-        <input type="hidden" name="role" value={role} />
-
-        {role === 'parent' && (
-          <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium text-slate-900">Guardian Name</label>
-            <input
-              required
-              name="guardianName"
-              type="text"
-              value={guardianName}
-              onChange={(e) => setGuardianName(e.target.value)}
-              placeholder="e.g. Rahul Sharma"
-              className="w-full h-12 px-4 bg-white border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-slate-900 outline-none"
-            />
-          </div>
-        )}
-
+        {/* Name Fields */}
         <div className="grid grid-cols-2 gap-3">
           <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium text-slate-900">Player First Name</label>
+            <label className="text-sm font-medium text-slate-900">First Name *</label>
             <input
               required
               name="firstName"
@@ -165,7 +106,7 @@ export function AddPlayerModal({ locations, onSuccess }: AddPlayerModalProps) {
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium text-slate-900">Player Last Name</label>
+            <label className="text-sm font-medium text-slate-900">Last Name *</label>
             <input
               required
               name="lastName"
@@ -178,26 +119,15 @@ export function AddPlayerModal({ locations, onSuccess }: AddPlayerModalProps) {
           </div>
         </div>
 
+        {/* Mobile Number Field */}
         <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium text-slate-900">Email Address</label>
-          <input
-            required
-            name="email"
-            type="email"
-            value={playerEmail}
-            onChange={(e) => setPlayerEmail(e.target.value)}
-            placeholder="parent@example.com"
-            className="w-full h-12 px-4 bg-white border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-slate-900 outline-none"
-          />
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium text-slate-900">Mobile Number</label>
+          <label className="text-sm font-medium text-slate-900">Mobile Number *</label>
           <div className="relative flex items-center">
             <span className="absolute left-3.5 text-slate-500 font-medium text-sm select-none pointer-events-none">
               +91
             </span>
             <input
+              required
               name="mobileNumber"
               type="tel"
               inputMode="numeric"
@@ -208,12 +138,14 @@ export function AddPlayerModal({ locations, onSuccess }: AddPlayerModalProps) {
               className="w-full h-12 pl-14 pr-4 bg-white border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-slate-900 outline-none"
             />
           </div>
+          <span className="text-[11px] text-slate-500">
+            Primary 10-digit phone used for roster contact and future account linking.
+          </span>
         </div>
 
-        <DobInput value={dob} onChange={setDob} label="Player Date of Birth" required />
-
+        {/* Location Dropdown */}
         <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium text-slate-900">Location</label>
+          <label className="text-sm font-medium text-slate-900">Location *</label>
           <select
             required
             name="locationId"
@@ -232,47 +164,30 @@ export function AddPlayerModal({ locations, onSuccess }: AddPlayerModalProps) {
           </select>
         </div>
 
-        {/* Editable Password Field */}
-        <div className="flex flex-col gap-1.5 pt-2 border-t border-slate-100">
+        {/* Email Field (Optional) */}
+        <div className="flex flex-col gap-1">
           <div className="flex justify-between items-center">
-            <label className="text-sm font-medium text-slate-900">Account Password</label>
-            <button
-              type="button"
-              onClick={() => setCustomPassword(generateRandomPassword())}
-              className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 hover:underline cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-[14px]">casino</span>
-              <span>Generate Random</span>
-            </button>
+            <label className="text-sm font-medium text-slate-900">Email Address</label>
+            <span className="text-xs text-slate-400">Optional</span>
           </div>
+          <input
+            name="email"
+            type="email"
+            value={playerEmail}
+            onChange={(e) => setPlayerEmail(e.target.value)}
+            placeholder="player@example.com"
+            className="w-full h-12 px-4 bg-white border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-slate-900 outline-none"
+          />
+        </div>
 
-          <div className="relative flex items-center">
-            <input
-              required
-              name="password"
-              type={showPasswordText ? 'text' : 'password'}
-              value={customPassword}
-              onChange={(e) => setCustomPassword(e.target.value)}
-              placeholder={DEFAULT_PRESET_PASSWORD}
-              className="w-full h-12 pl-4 pr-10 bg-white border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-slate-900 outline-none font-mono"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPasswordText(!showPasswordText)}
-              className="absolute right-3 text-slate-400 hover:text-slate-600 p-1"
-            >
-              <span className="material-symbols-outlined text-[18px]">
-                {showPasswordText ? 'visibility_off' : 'visibility'}
-              </span>
-            </button>
-          </div>
-          <p className="text-[11px] text-slate-500">
-            Defaulted to{' '}
-            <code className="bg-slate-100 px-1 py-0.5 rounded font-bold text-slate-800">
-              {DEFAULT_PRESET_PASSWORD}
-            </code>
-            . You can edit it manually or click Generate Random.
-          </p>
+        {/* Date of Birth Field (Required) */}
+        <div className="flex flex-col gap-1">
+          <DobInput
+            value={dob}
+            onChange={setDob}
+            label="Date of Birth"
+            required={true}
+          />
         </div>
 
         <button
@@ -283,10 +198,10 @@ export function AddPlayerModal({ locations, onSuccess }: AddPlayerModalProps) {
           {isPending ? (
             <>
               <Spinner size="sm" color="white" />
-              <span>Registering...</span>
+              <span>Adding Player...</span>
             </>
           ) : (
-            <span>Send Confirmation & Register</span>
+            <span>Add Player to Roster</span>
           )}
         </button>
       </form>

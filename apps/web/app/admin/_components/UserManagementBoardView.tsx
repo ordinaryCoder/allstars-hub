@@ -11,7 +11,7 @@ import {
   getFilterOptionsAdmin,
 } from '../_actions/action';
 
-import type { User, PlayerRecord, ViewMode } from './user-management/types';
+import type { User, PlayerRecord, ViewMode, PendingConflictCheckResult } from './user-management/types';
 import { getPermissionsStr } from './user-management/types';
 import { FilterDropdown } from './user-management/FilterDropdown';
 import { SearchInput } from './user-management/SearchInput';
@@ -20,6 +20,7 @@ import { PlayerRecordCard } from './user-management/PlayerRecordCard';
 import { PendingUserCard } from './user-management/PendingUserCard';
 import { DeactivateConfirmModal } from './user-management/DeactivateConfirmModal';
 import { ReactivateConfirmModal } from './user-management/ReactivateConfirmModal';
+import { PlayerConflictModal } from './user-management/PlayerConflictModal';
 
 export type { User };
 
@@ -50,6 +51,7 @@ export function UserManagementBoardView({ initialPlayers = [] }: { initialPlayer
   const [playerToDeactivate, setPlayerToDeactivate] = useState<PlayerRecord | null>(null);
   const [playerToReactivate, setPlayerToReactivate] = useState<PlayerRecord | null>(null);
   const [isSubmittingAction, setIsSubmittingAction] = useState(false);
+  const [conflictData, setConflictData] = useState<PendingConflictCheckResult | null>(null);
 
   // Load location filter options on mount
   useEffect(() => {
@@ -167,6 +169,11 @@ export function UserManagementBoardView({ initialPlayers = [] }: { initialPlayer
       ...prev,
       pending: (prev.pending || []).filter((u) => u.id !== id),
     }));
+  };
+
+  const handleConflictResolved = (id: string) => {
+    handleRemovePending(id);
+    setPlayerRecordMap({});
   };
 
   // ── Player record deactivation / reactivation ─────────────────────────────
@@ -308,7 +315,14 @@ export function UserManagementBoardView({ initialPlayers = [] }: { initialPlayer
           // ── User cards (coaches / pending) ──
           (paginatedList as User[]).map((user) => {
             if (viewMode === 'pending') {
-              return <PendingUserCard key={user.id} user={user} onApprove={handleRemovePending} />;
+              return (
+                <PendingUserCard
+                  key={user.id}
+                  user={user}
+                  onApprove={handleRemovePending}
+                  onConflict={setConflictData}
+                />
+              );
             }
             return (
               <ActiveUserCard
@@ -354,6 +368,15 @@ export function UserManagementBoardView({ initialPlayers = [] }: { initialPlayer
         onConfirm={handleConfirmReactivate}
         isSubmitting={isSubmittingAction}
       />
+
+      {conflictData && (
+        <PlayerConflictModal
+          conflictData={conflictData}
+          locations={filterLocations}
+          onClose={() => setConflictData(null)}
+          onResolved={handleConflictResolved}
+        />
+      )}
     </div>
   );
 }

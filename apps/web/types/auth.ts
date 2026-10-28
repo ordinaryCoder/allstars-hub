@@ -15,7 +15,7 @@ export interface LoginState {
 }
 
 export type SignupState =
-  | { success: false; error: string }
+  | { success: false; error: string; isDuplicate?: boolean; conflictField?: 'email' | 'mobile' | 'both' }
   | { success: true; email: string; passwordUsed?: string };
 
 export interface LocationOption {

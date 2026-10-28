@@ -7,7 +7,7 @@ import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '@/lib/server';
 import { requireRole } from '@/lib/dal';
 
-import { validateCoachData, normalizeIndianMobile } from '@/lib/validations/signup';
+import { validateCoachData, validateAdminPlayerData, normalizeIndianMobile } from '@/lib/validations/signup';
 import { DEFAULT_PRESET_PASSWORD } from '@/lib/constants/auth';
 
 
@@ -18,20 +18,367 @@ function generateTempPassword() {
 /**
  * Approves a pending user (Admin only).
  */
-export async function approveUser(formData: FormData): Promise<void> {
-  await requireRole('admin');
-
-  const userId = formData.get('userId')?.toString().trim();
-  if (!userId) {
-    return;
-  }
-
-  await prisma.user.update({
+async function getPendingUserSignupDetails(userId: string) {
+  const user = await prisma.user.findUnique({
     where: { id: userId },
-    data: { status: 'ACTIVE' },
+    include: { academy_roles: true },
   });
 
-  revalidatePath('/admin');
+  if (!user) {
+    throw new Error('User not found');
+  }
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  let meta: Record<string, any> = {};
+  if (serviceRoleKey) {
+    try {
+      const supabaseAdmin = createSupabaseClient(supabaseUrl, serviceRoleKey, {
+        auth: { autoRefreshToken: false, persistSession: false },
+      });
+      const { data: authData } = await supabaseAdmin.auth.admin.getUserById(userId);
+      if (authData?.user?.user_metadata) {
+        meta = authData.user.user_metadata;
+      }
+    } catch (err) {
+      console.warn('Failed to fetch user metadata from Supabase Admin API:', err);
+    }
+  }
+
+  if (!meta || Object.keys(meta).length === 0) {
+    try {
+      const rawUserRows: any = await prisma.$queryRawUnsafe(
+        'SELECT raw_user_meta_data FROM auth.users WHERE id = $1::uuid',
+        userId
+      );
+      if (rawUserRows?.[0]?.raw_user_meta_data) {
+        meta = rawUserRows[0].raw_user_meta_data;
+      }
+    } catch (e) {
+      // fallback
+    }
+  }
+
+  const rolePerm = user.academy_roles?.[0]?.permissions;
+  const roleFromPerm = Array.isArray(rolePerm) ? rolePerm[0] : String(rolePerm || '');
+  const role = (meta.role || roleFromPerm || 'player').toLowerCase();
+
+  const mobileNumber = normalizeIndianMobile(meta.mobile_number || user.mobile_number || '');
+  const locationId = meta.location_id || '';
+  const dob = meta.dob || null;
+  const guardianName = meta.guardian_name || (role === 'parent' ? user.first_name : '');
+
+  const firstName = (meta.first_name || user.first_name || '').trim();
+  const lastName = (meta.last_name || user.last_name || '').trim();
+
+  let locationName = '';
+  if (locationId) {
+    const loc = await prisma.location.findUnique({
+      where: { id: locationId },
+      select: { name: true },
+    });
+    locationName = loc?.name || '';
+  }
+
+  return {
+    user,
+    role,
+    firstName,
+    lastName,
+    guardianName,
+    mobileNumber,
+    locationId,
+    locationName,
+    dob,
+  };
+}
+
+export async function checkPendingUserConflict(userId: string) {
+  await requireRole('admin');
+
+  const details = await getPendingUserSignupDetails(userId);
+  const academy = await prisma.academy.findFirst({
+    where: { is_active: true },
+    select: { id: true },
+  });
+
+  if (!academy) {
+    throw new Error('No active academy found');
+  }
+
+  const orConditions: any[] = [];
+  // 1. Mobile number match across academy
+  if (details.mobileNumber) {
+    orConditions.push({ mobile_number: details.mobileNumber });
+  }
+
+  // 2. Location-scoped name match: (location_id AND matching first_name + last_name)
+  const trimmedFirst = details.firstName?.trim();
+  const trimmedLast = details.lastName?.trim();
+
+  if (details.locationId && trimmedFirst && trimmedLast) {
+    orConditions.push({
+      location_id: details.locationId,
+      first_name: { equals: trimmedFirst, mode: 'insensitive' },
+      last_name: { equals: trimmedLast, mode: 'insensitive' },
+    });
+  } else if (details.locationId && trimmedFirst) {
+    orConditions.push({
+      location_id: details.locationId,
+      first_name: { equals: trimmedFirst, mode: 'insensitive' },
+    });
+  }
+
+  if (orConditions.length === 0) {
+    return {
+      hasConflict: false,
+      user: {
+        id: details.user.id,
+        email: details.user.email,
+        firstName: details.firstName,
+        lastName: details.lastName,
+        mobileNumber: '',
+        role: details.role,
+        guardianName: details.guardianName,
+        dob: details.dob,
+        locationId: details.locationId,
+        locationName: details.locationName,
+      },
+      matchingPlayers: [],
+    };
+  }
+
+  const matchingPlayers = await prisma.player.findMany({
+    where: {
+      academy_id: academy.id,
+      OR: orConditions,
+    },
+    include: {
+      location: { select: { id: true, name: true } },
+      user: { select: { id: true, first_name: true, last_name: true, email: true } },
+      parents: {
+        include: {
+          parent: { select: { id: true, first_name: true, last_name: true, email: true } },
+        },
+      },
+    },
+  });
+
+  return {
+    hasConflict: matchingPlayers.length > 0,
+    user: {
+      id: details.user.id,
+      email: details.user.email,
+      firstName: details.firstName,
+      lastName: details.lastName,
+      mobileNumber: details.mobileNumber,
+      role: details.role,
+      guardianName: details.guardianName,
+      dob: details.dob,
+      locationId: details.locationId,
+      locationName: details.locationName,
+    },
+    matchingPlayers: matchingPlayers.map((p) => ({
+      id: p.id,
+      first_name: p.first_name,
+      last_name: p.last_name,
+      mobile_number: p.mobile_number,
+      email: p.email,
+      dob: p.dob,
+      is_active: p.is_active,
+      location: p.location,
+      linked_user: p.user,
+      parents: p.parents,
+    })),
+  };
+}
+
+export async function resolveUserApproval(params: {
+  userId: string;
+  action: 'APPROVE_NEW_AND_LINK_EXISTING' | 'UPDATE_AND_APPROVE_DETAILS' | 'REJECT_REQUEST';
+  mergePlayerId?: string;
+  mergedData?: {
+    firstName?: string;
+    lastName?: string;
+    dob?: string | null;
+    locationId?: string;
+    mobileNumber?: string;
+  };
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    await requireRole('admin');
+    const { userId, action, mergePlayerId, mergedData } = params;
+    if (!userId) {
+      return { success: false, error: 'User ID is required' };
+    }
+
+    if (action === 'REJECT_REQUEST') {
+      await prisma.user.update({
+        where: { id: userId },
+        data: { status: 'INACTIVE' },
+      });
+      revalidatePath('/admin');
+      revalidateTag('user-profiles', 'default');
+      return { success: true };
+    }
+
+    const details = await getPendingUserSignupDetails(userId);
+    const academy = await prisma.academy.findFirst({
+      where: { is_active: true },
+      select: { id: true },
+    });
+
+    if (!academy) {
+      return { success: false, error: 'No active academy found' };
+    }
+
+    let effectiveLocationId = details.locationId;
+    if (!effectiveLocationId) {
+      const firstLoc = await prisma.location.findFirst({
+        where: { academy_id: academy.id },
+        select: { id: true },
+      });
+      effectiveLocationId = firstLoc?.id || '';
+    }
+
+    if (action === 'APPROVE_NEW_AND_LINK_EXISTING') {
+      await prisma.$transaction(async (tx) => {
+        // 1. Activate user
+        await tx.user.update({
+          where: { id: userId },
+          data: { status: 'ACTIVE' },
+        });
+
+        // 2. Create new player
+        const newPlayer = await tx.player.create({
+          data: {
+            academy_id: academy.id,
+            location_id: effectiveLocationId,
+            user_id: details.role === 'player' ? userId : null,
+            first_name: details.firstName,
+            last_name: details.lastName,
+            mobile_number: details.mobileNumber,
+            email: details.role === 'player' ? details.user.email : null,
+            dob: details.dob ? new Date(details.dob) : new Date(),
+            is_active: true,
+          },
+        });
+
+        // 3. If parent, link new child and all matching existing players with this phone number
+        if (details.role === 'parent') {
+          await tx.parentPlayer.create({
+            data: {
+              parent_user_id: userId,
+              player_id: newPlayer.id,
+            },
+          });
+
+          if (details.mobileNumber) {
+            const matchingPlayers = await tx.player.findMany({
+              where: {
+                academy_id: academy.id,
+                mobile_number: details.mobileNumber,
+                id: { not: newPlayer.id },
+              },
+              select: { id: true },
+            });
+
+            for (const p of matchingPlayers) {
+              await tx.parentPlayer.upsert({
+                where: {
+                  parent_user_id_player_id: {
+                    parent_user_id: userId,
+                    player_id: p.id,
+                  },
+                },
+                create: {
+                  parent_user_id: userId,
+                  player_id: p.id,
+                },
+                update: {},
+              });
+            }
+          }
+        }
+      });
+    } else if (action === 'UPDATE_AND_APPROVE_DETAILS') {
+      if (!mergePlayerId) {
+        return { success: false, error: 'Target player record to merge is required' };
+      }
+
+      await prisma.$transaction(async (tx) => {
+        // 1. Activate user
+        await tx.user.update({
+          where: { id: userId },
+          data: { status: 'ACTIVE' },
+        });
+
+        const updatedFirstName = mergedData?.firstName?.trim() || details.firstName;
+        const updatedLastName = mergedData?.lastName?.trim() || details.lastName;
+        const updatedLocationId = mergedData?.locationId || effectiveLocationId;
+        const updatedDob = mergedData?.dob ? new Date(mergedData.dob) : (details.dob ? new Date(details.dob) : undefined);
+        const updatedMobile = mergedData?.mobileNumber ? normalizeIndianMobile(mergedData.mobileNumber) : details.mobileNumber;
+
+        // 2. Overwrite existing player details and link user if player
+        await tx.player.update({
+          where: { id: mergePlayerId },
+          data: {
+            first_name: updatedFirstName,
+            last_name: updatedLastName,
+            location_id: updatedLocationId,
+            dob: updatedDob,
+            mobile_number: updatedMobile || undefined,
+            user_id: details.role === 'player' ? userId : undefined,
+          },
+        });
+
+        // 3. If parent, link existing player to parent
+        if (details.role === 'parent') {
+          await tx.parentPlayer.upsert({
+            where: {
+              parent_user_id_player_id: {
+                parent_user_id: userId,
+                player_id: mergePlayerId,
+              },
+            },
+            create: {
+              parent_user_id: userId,
+              player_id: mergePlayerId,
+            },
+            update: {},
+          });
+        }
+      });
+    }
+
+    revalidatePath('/admin');
+    revalidatePath('/coach/player-list');
+    revalidatePath('/coach/new-session');
+    revalidatePath('/coach/attendance-report');
+    revalidateTag('player-counts', 'default');
+    revalidateTag('coach-player-list', 'default');
+    revalidateTag('user-profiles', 'default');
+
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error resolving user approval:', error);
+    return { success: false, error: error?.message || 'Failed to resolve user approval' };
+  }
+}
+
+export async function approvePendingUser(userId: string): Promise<{ success: boolean; error?: string }> {
+  return await resolveUserApproval({
+    userId,
+    action: 'APPROVE_NEW_AND_LINK_EXISTING',
+  });
+}
+
+export async function approveUser(formData: FormData): Promise<void> {
+  await requireRole('admin');
+  const userId = formData.get('userId')?.toString().trim();
+  if (!userId) return;
+  await approvePendingUser(userId);
 }
 
 /**
@@ -313,16 +660,69 @@ export async function reactivatePlayer(userId: string): Promise<{ success: boole
 }
 
 
-export async function addPlayerAdmin(formData: FormData): Promise<{ success: false; error: string } | { success: true; email: string; passwordUsed: string }> {
+export async function addPlayerAdmin(formData: FormData): Promise<{ success: true; playerName: string } | { success: false; error: string }> {
   await requireRole('admin');
 
-  const res = await signup(formData);
-  if (!res.success) return { success: false, error: res.error };
-  revalidatePath('/admin');
-  revalidateTag('player-counts', 'default');
-  revalidateTag('coach-player-list', 'default');
-  revalidateTag('user-profiles', 'default');
-  return { success: true, email: res.email, passwordUsed: res.passwordUsed || DEFAULT_PRESET_PASSWORD };
+  const firstName = formData.get('firstName')?.toString().trim() || '';
+  const lastName = formData.get('lastName')?.toString().trim() || '';
+  const mobileNumber = normalizeIndianMobile(formData.get('mobileNumber')?.toString() || '');
+  const locationId = formData.get('locationId')?.toString().trim() || '';
+  const emailRaw = formData.get('email')?.toString().trim() || '';
+  const email = emailRaw ? emailRaw.toLowerCase() : null;
+  const dobRaw = formData.get('dob')?.toString().trim() || '';
+
+  const validation = validateAdminPlayerData({
+    firstName,
+    lastName,
+    mobileNumber,
+    locationId,
+    email: email || undefined,
+    dob: dobRaw,
+  });
+
+  if (!validation.isValid && validation.error) {
+    return { success: false, error: validation.error };
+  }
+
+  const dob = new Date(dobRaw);
+
+  const academy = await prisma.academy.findFirst({
+    where: { is_active: true },
+    select: { id: true },
+  });
+
+  if (!academy) {
+    return { success: false, error: 'No active academy available' };
+  }
+
+  try {
+    await prisma.player.create({
+      data: {
+        academy_id: academy.id,
+        location_id: locationId,
+        first_name: firstName,
+        last_name: lastName,
+        mobile_number: mobileNumber,
+        email,
+        dob,
+        user_id: null,
+        is_active: true,
+      },
+    });
+
+    revalidatePath('/admin');
+    revalidatePath('/coach/player-list');
+    revalidatePath('/coach/new-session');
+    revalidatePath('/coach/attendance-report');
+    revalidateTag('player-counts', 'default');
+    revalidateTag('coach-player-list', 'default');
+    revalidateTag('user-profiles', 'default');
+
+    return { success: true, playerName: `${firstName} ${lastName}`.trim() };
+  } catch (error: any) {
+    console.error('Error adding player admin:', error);
+    return { success: false, error: error?.message || 'Failed to add player' };
+  }
 }
 
 export async function addCoachAdmin(formData: FormData): Promise<{ success: false; error: string } | { success: true; email: string; passwordUsed: string }> {
@@ -465,6 +865,8 @@ export async function getPlayerRecords(status: 'active' | 'inactive') {
       first_name: true,
       last_name: true,
       dob: true,
+      mobile_number: true,
+      email: true,
       is_active: true,
       location: { select: { id: true, name: true } },
       // Self-login user linked directly
@@ -498,6 +900,8 @@ export async function getPlayerRecords(status: 'active' | 'inactive') {
     first_name: p.first_name,
     last_name: p.last_name,
     dob: p.dob,
+    mobile_number: p.mobile_number,
+    email: p.email,
     is_active: p.is_active,
     location: p.location ?? null,
     linked_user: p.user ?? null,

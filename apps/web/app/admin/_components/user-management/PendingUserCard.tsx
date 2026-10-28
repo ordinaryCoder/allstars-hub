@@ -1,25 +1,39 @@
 'use client';
 
 import { useState } from 'react';
-import type { User } from './types';
+import type { User, PendingConflictCheckResult } from './types';
 import { getPrimaryRole } from './types';
-import { approveUser as approveUserAction } from '../../_actions/action';
+import { checkPendingUserConflict, approvePendingUser } from '../../_actions/action';
+import { useSnackbar } from '@/components/ui/Snackbar';
+import { Spinner } from '@/components/ui/Loading';
 
 interface PendingUserCardProps {
   user: User;
   onApprove: (id: string) => void;
+  onConflict?: (conflictData: PendingConflictCheckResult) => void;
 }
 
-export function PendingUserCard({ user, onApprove }: PendingUserCardProps) {
+export function PendingUserCard({ user, onApprove, onConflict }: PendingUserCardProps) {
   const [isPending, setIsPending] = useState(false);
+  const { showSnackbar } = useSnackbar();
 
-  const handleApprove = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const handleReviewOrApprove = async () => {
     setIsPending(true);
-    const formData = new FormData(e.currentTarget);
     try {
-      await approveUserAction(formData);
-      onApprove(user.id);
+      const conflictRes = await checkPendingUserConflict(user.id);
+      if (conflictRes.hasConflict && onConflict) {
+        onConflict(conflictRes);
+      } else {
+        const approveRes = await approvePendingUser(user.id);
+        if (!approveRes.success) {
+          showSnackbar({ message: approveRes.error || 'Failed to approve user', type: 'error' });
+        } else {
+          showSnackbar({ message: 'User approved successfully', type: 'success' });
+          onApprove(user.id);
+        }
+      }
+    } catch (err: any) {
+      showSnackbar({ message: err?.message || 'Error reviewing user', type: 'error' });
     } finally {
       setIsPending(false);
     }
@@ -47,16 +61,23 @@ export function PendingUserCard({ user, onApprove }: PendingUserCardProps) {
           </div>
         </div>
       </div>
-      <form onSubmit={handleApprove}>
-        <input type="hidden" name="userId" value={user.id} />
+      <div>
         <button
-          type="submit"
+          type="button"
+          onClick={handleReviewOrApprove}
           disabled={isPending}
           className="w-full h-[44px] bg-slate-900 text-white rounded-xl text-[14px] font-medium hover:opacity-90 active:scale-[0.98] transition-all mt-2 shadow-sm flex items-center justify-center gap-2 disabled:opacity-50"
         >
-          {isPending ? 'Approving...' : 'Approve'}
+          {isPending ? (
+            <>
+              <Spinner size="sm" color="white" />
+              <span>Checking...</span>
+            </>
+          ) : (
+            <span>Review / Approve</span>
+          )}
         </button>
-      </form>
+      </div>
     </div>
   );
 }

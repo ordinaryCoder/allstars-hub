@@ -5,11 +5,12 @@ import React, { useState, useEffect, useMemo } from 'react';
 export interface DobInputProps {
   id?: string;
   name?: string;
-  label: string;
+  label?: string;
   value: string; // Expected format: YYYY-MM-DD
   onChange: (value: string) => void;
   required?: boolean;
   disabled?: boolean;
+  size?: 'sm' | 'md';
 }
 
 const MONTHS = [
@@ -35,6 +36,7 @@ export function DobInput({
   onChange,
   required = false,
   disabled = false,
+  size = 'md',
 }: DobInputProps) {
   const [day, setDay] = useState('');
   const [month, setMonth] = useState('');
@@ -102,14 +104,18 @@ export function DobInput({
   };
 
   const selectClasses =
-    'h-12 px-3 bg-white border border-gray-300 rounded-xl text-base text-gray-900 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all hover:border-gray-400 cursor-pointer disabled:opacity-50 disabled:bg-gray-50';
+    size === 'sm'
+      ? 'h-10 px-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900 transition-all hover:border-slate-300 cursor-pointer disabled:opacity-50 disabled:bg-slate-50'
+      : 'h-12 px-3 bg-white border border-gray-300 rounded-xl text-base text-gray-900 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all hover:border-gray-400 cursor-pointer disabled:opacity-50 disabled:bg-gray-50';
 
   return (
-    <div className="flex flex-col gap-1">
-      <label className="text-sm font-medium text-gray-900" htmlFor={id}>
-        {label}
-      </label>
-      <div className="flex gap-2 sm:gap-3">
+    <div className="flex flex-col gap-1 w-full">
+      {label && (
+        <label className="text-sm font-medium text-gray-900" htmlFor={id}>
+          {label}
+        </label>
+      )}
+      <div className="flex gap-2 sm:gap-3 w-full">
         <select
           value={month}
           onChange={(e) => handleDateChange('month', e.target.value)}

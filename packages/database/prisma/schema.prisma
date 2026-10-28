@@ -111,14 +111,16 @@ model Batch {
 }
 
 model Player {
-  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  academy_id  String   @db.Uuid
-  location_id String   @db.Uuid // Player's primary or registered branch
-  user_id     String?  @db.Uuid // Nullable for self-login
-  first_name  String
-  last_name   String
-  dob         DateTime @db.Date
-  is_active   Boolean  @default(true)
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  academy_id    String    @db.Uuid
+  location_id   String    @db.Uuid // Player's primary or registered branch
+  user_id       String?   @db.Uuid // Nullable for self-login
+  first_name    String
+  last_name     String
+  mobile_number String    // Primary phone for matching & communication
+  email         String?   // Optional email
+  dob           DateTime  @db.Date
+  is_active     Boolean   @default(true)
 
   user       User?          @relation("UserPlayers", fields: [user_id], references: [id])
   academy    Academy        @relation(fields: [academy_id], references: [id])
@@ -128,6 +130,7 @@ model Player {
   parents    ParentPlayer[]
 
   @@index([location_id, is_active]) // coach player list + RLS location filter
+  @@index([academy_id, mobile_number]) // rapid duplicate lookup
   @@index([academy_id])             // RLS tenant isolation check
   @@index([user_id])                // self-view RLS condition
   @@map("players")
