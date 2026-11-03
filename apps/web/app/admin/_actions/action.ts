@@ -660,7 +660,27 @@ export async function reactivatePlayer(userId: string): Promise<{ success: boole
 }
 
 
-export async function addPlayerAdmin(formData: FormData): Promise<{ success: true; playerName: string } | { success: false; error: string }> {
+export interface ExistingPlayerConflict {
+  id: string;
+  first_name: string;
+  last_name: string;
+  mobile_number: string;
+  email: string | null;
+  locationName: string;
+}
+
+export type AddPlayerAdminResult =
+  | { success: true; playerName: string }
+  | {
+      success: false;
+      hasConflict: true;
+      conflictType: 'mobile' | 'email' | 'both';
+      existingPlayers: ExistingPlayerConflict[];
+      error: string;
+    }
+  | { success: false; hasConflict?: false; error: string };
+
+export async function addPlayerAdmin(formData: FormData): Promise<AddPlayerAdminResult> {
   await requireRole('admin');
 
   const firstName = formData.get('firstName')?.toString().trim() || '';
@@ -670,6 +690,7 @@ export async function addPlayerAdmin(formData: FormData): Promise<{ success: tru
   const emailRaw = formData.get('email')?.toString().trim() || '';
   const email = emailRaw ? emailRaw.toLowerCase() : null;
   const dobRaw = formData.get('dob')?.toString().trim() || '';
+  const allowDuplicate = formData.get('allowDuplicate')?.toString() === 'true';
 
   const validation = validateAdminPlayerData({
     firstName,
@@ -693,6 +714,57 @@ export async function addPlayerAdmin(formData: FormData): Promise<{ success: tru
 
   if (!academy) {
     return { success: false, error: 'No active academy available' };
+  }
+
+  // If not explicitly bypassed with allowDuplicate, check if mobile or email already exists in players table
+  if (!allowDuplicate) {
+    const orConditions: any[] = [{ mobile_number: mobileNumber }];
+    if (email) {
+      orConditions.push({ email: { equals: email, mode: 'insensitive' } });
+    }
+
+    const matchingPlayers = await prisma.player.findMany({
+      where: {
+        academy_id: academy.id,
+        OR: orConditions,
+      },
+      include: {
+        location: { select: { name: true } },
+      },
+      take: 5,
+    });
+
+    if (matchingPlayers.length > 0) {
+      const hasMobileMatch = matchingPlayers.some((p) => p.mobile_number === mobileNumber);
+      const hasEmailMatch = !!email && matchingPlayers.some((p) => p.email?.toLowerCase() === email);
+
+      const conflictType: 'mobile' | 'email' | 'both' =
+        hasMobileMatch && hasEmailMatch ? 'both' : hasMobileMatch ? 'mobile' : 'email';
+
+      const conflictPlayers: ExistingPlayerConflict[] = matchingPlayers.map((p) => ({
+        id: p.id,
+        first_name: p.first_name,
+        last_name: p.last_name,
+        mobile_number: p.mobile_number,
+        email: p.email,
+        locationName: p.location?.name || 'Unknown',
+      }));
+
+      const desc =
+        conflictType === 'both'
+          ? 'Mobile number and email address are already registered to existing player(s).'
+          : conflictType === 'mobile'
+          ? `Mobile number (+91 ${mobileNumber}) is already registered to existing player(s).`
+          : `Email (${email}) is already registered to existing player(s).`;
+
+      return {
+        success: false,
+        hasConflict: true,
+        conflictType,
+        existingPlayers: conflictPlayers,
+        error: desc,
+      };
+    }
   }
 
   try {
