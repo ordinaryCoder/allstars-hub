@@ -71,7 +71,7 @@ export function PlayerRecordCard({
           {player.first_name} {player.last_name}
         </span>
 
-        {/* Location pill + age */}
+        {/* Location pill + age + mobile */}
         <div className="flex items-center gap-2 flex-wrap">
           {player.location?.name && (
             <span className="inline-flex items-center gap-0.5 text-[11px] font-medium text-slate-500">
@@ -79,6 +79,14 @@ export function PlayerRecordCard({
                 location_on
               </span>
               {player.location.name}
+            </span>
+          )}
+          {player.mobile_number && (
+            <span className="inline-flex items-center gap-0.5 text-[11px] font-medium text-slate-500">
+              <span className="material-symbols-outlined text-[13px] text-slate-400">
+                call
+              </span>
+              +91 {player.mobile_number}
             </span>
           )}
           {player.dob && (

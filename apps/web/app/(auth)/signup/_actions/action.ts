@@ -46,6 +46,71 @@ export async function signup(formData: FormData): Promise<SignupState> {
     return { success: false, error: validationResult.error };
   }
 
+  const normalizedEmail = email.toLowerCase();
+  const normalizedMobile = mobileNumber;
+
+  // Check if an account already exists with this email or mobile number in public.users
+  const existingUser = await prisma.user.findFirst({
+    where: {
+      OR: [
+        { email: { equals: normalizedEmail, mode: 'insensitive' } },
+        { mobile_number: normalizedMobile },
+      ],
+    },
+    select: { email: true, mobile_number: true },
+  });
+
+  let emailExists = !!(existingUser && existingUser.email?.toLowerCase() === normalizedEmail);
+  let mobileExists = !!(existingUser && existingUser.mobile_number === normalizedMobile);
+
+  // If not found in public.users, also check auth.users (e.g. pending/unconfirmed registrations)
+  if (!emailExists || !mobileExists) {
+    try {
+      const authMatches: any = await prisma.$queryRawUnsafe(
+        `SELECT email, raw_user_meta_data->>'mobile_number' as mobile
+         FROM auth.users
+         WHERE LOWER(email) = LOWER($1)
+            OR raw_user_meta_data->>'mobile_number' = $2
+            OR phone = $2
+            OR phone = $3
+         LIMIT 1`,
+        normalizedEmail,
+        normalizedMobile,
+        `+91${normalizedMobile}`
+      );
+      if (authMatches && authMatches.length > 0) {
+        if (authMatches[0].email?.toLowerCase() === normalizedEmail) {
+          emailExists = true;
+        }
+        const authMobileRaw = (authMatches[0].mobile || '').replace(/\D/g, '').slice(-10);
+        if (authMobileRaw === normalizedMobile) {
+          mobileExists = true;
+        }
+      }
+    } catch {
+      // Fallback gracefully if direct auth.users query is not permitted
+    }
+  }
+
+  if (emailExists || mobileExists) {
+    const conflictField: 'both' | 'email' | 'mobile' =
+      emailExists && mobileExists ? 'both' : emailExists ? 'email' : 'mobile';
+
+    const fieldLabel =
+      conflictField === 'both'
+        ? 'An account with this email address and mobile number'
+        : conflictField === 'email'
+        ? 'An account with this email address'
+        : 'An account with this mobile number';
+
+    return {
+      success: false,
+      error: `${fieldLabel} already exists in our system. Please log in or contact support for assistance.`,
+      isDuplicate: true,
+      conflictField,
+    };
+  }
+
   const academy = await prisma.academy.findFirst({
     where: { is_active: true },
     select: { id: true },
@@ -86,6 +151,20 @@ export async function signup(formData: FormData): Promise<SignupState> {
   });
 
   if (authError || !authData?.user) {
+    const isUserAlreadyRegistered =
+      authError?.message?.toLowerCase().includes('already registered') ||
+      authError?.message?.toLowerCase().includes('already exists') ||
+      authError?.status === 422;
+
+    if (isUserAlreadyRegistered) {
+      return {
+        success: false,
+        error: 'An account with this email address already exists in our system. Please log in or contact support for assistance.',
+        isDuplicate: true,
+        conflictField: 'email',
+      };
+    }
+
     return {
       success: false,
       error: authError?.message ?? 'Unable to create account',

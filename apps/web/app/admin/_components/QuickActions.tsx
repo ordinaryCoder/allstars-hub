@@ -77,7 +77,7 @@ export function QuickActions({ locations = [] }: QuickActionsProps) {
             )}
 
             {modal === 'player' && (
-              <AddPlayerModal locations={locations} onSuccess={handleSuccess} />
+              <AddPlayerModal locations={locations} onClose={() => setModal('none')} />
             )}
 
             {modal === 'coach' && (

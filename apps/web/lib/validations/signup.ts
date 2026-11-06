@@ -185,3 +185,44 @@ export function validateCoachData(data: CoachInputData): ValidationResult {
 
   return { isValid: true, error: null };
 }
+
+
+export interface AdminPlayerInputData {
+  firstName: string;
+  lastName: string;
+  mobileNumber: string;
+  locationId: string;
+  dob: string;
+  email?: string;
+}
+
+export function validateAdminPlayerData(data: AdminPlayerInputData): ValidationResult {
+  const { firstName, lastName, mobileNumber, locationId, email, dob } = data;
+
+  if (!firstName || !lastName || !mobileNumber || !locationId || !dob) {
+    return { isValid: false, error: 'Please fill in all required fields' };
+  }
+
+  const firstNameVal = validateName(firstName, 'First Name');
+  if (!firstNameVal.isValid) return firstNameVal;
+
+  const lastNameVal = validateName(lastName, 'Last Name');
+  if (!lastNameVal.isValid) return lastNameVal;
+
+  const mobileVal = validateMobileNumber(mobileNumber);
+  if (!mobileVal.isValid) return mobileVal;
+
+  if (!locationId.trim()) {
+    return { isValid: false, error: 'Please select a location' };
+  }
+
+  const dobVal = validateDob(dob.trim(), 4);
+  if (!dobVal.isValid) return dobVal;
+
+  if (email && email.trim()) {
+    const emailVal = validateEmail(email.trim());
+    if (!emailVal.isValid) return emailVal;
+  }
+
+  return { isValid: true, error: null };
+}

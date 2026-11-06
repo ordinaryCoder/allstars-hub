@@ -24,13 +24,47 @@ export interface PlayerRecord {
   id: string; // players.id (UUID)
   first_name: string;
   last_name: string;
-  dob?: Date | string | null;
+  dob: Date | string;
+  mobile_number?: string | null;
+  email?: string | null;
   is_active: boolean;
   location?: { id: string; name: string } | null;
   /** The user account directly linked (self-login player) */
   linked_user?: { id: string; first_name: string; last_name: string; email?: string | null } | null;
   /** Parent accounts linked via parent_player */
   parent_accounts?: Array<{ id: string; first_name: string; last_name: string; email?: string | null }>;
+}
+
+export interface ConflictPendingUserDetails {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  mobileNumber: string;
+  role: string;
+  guardianName?: string;
+  dob?: string | null;
+  locationId: string;
+  locationName: string;
+}
+
+export interface MatchingConflictPlayer {
+  id: string;
+  first_name: string;
+  last_name: string;
+  mobile_number: string;
+  email?: string | null;
+  dob: Date | string;
+  is_active: boolean;
+  location?: { id: string; name: string } | null;
+  linked_user?: { id: string; first_name: string; last_name: string; email?: string | null } | null;
+  parents?: Array<{ parent: { id: string; first_name: string; last_name: string; email?: string | null } }>;
+}
+
+export interface PendingConflictCheckResult {
+  hasConflict: boolean;
+  user: ConflictPendingUserDetails;
+  matchingPlayers: MatchingConflictPlayer[];
 }
 
 /** Minimal shape required by confirmation modals — satisfied by both User and PlayerRecord */
