@@ -7,7 +7,12 @@ import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '@/lib/server';
 import { requireRole } from '@/lib/dal';
 
-import { validateCoachData, validateAdminPlayerData, normalizeIndianMobile } from '@/lib/validations/signup';
+import {
+  validateCoachData,
+  validateAdminPlayerData,
+  normalizeIndianMobile,
+  isPlaceholderMobile,
+} from '@/lib/validations/signup';
 import { DEFAULT_PRESET_PASSWORD } from '@/lib/constants/auth';
 
 
@@ -108,8 +113,8 @@ export async function checkPendingUserConflict(userId: string) {
   }
 
   const orConditions: any[] = [];
-  // 1. Mobile number match across academy
-  if (details.mobileNumber) {
+  // 1. Mobile number match across academy (ignore sentinel/placeholder numbers)
+  if (details.mobileNumber && !isPlaceholderMobile(details.mobileNumber)) {
     orConditions.push({ mobile_number: details.mobileNumber });
   }
 
@@ -718,21 +723,26 @@ export async function addPlayerAdmin(formData: FormData): Promise<AddPlayerAdmin
 
   // If not explicitly bypassed with allowDuplicate, check if mobile or email already exists in players table
   if (!allowDuplicate) {
-    const orConditions: any[] = [{ mobile_number: mobileNumber }];
+    const orConditions: any[] = [];
+    if (!isPlaceholderMobile(mobileNumber)) {
+      orConditions.push({ mobile_number: mobileNumber });
+    }
     if (email) {
       orConditions.push({ email: { equals: email, mode: 'insensitive' } });
     }
 
-    const matchingPlayers = await prisma.player.findMany({
-      where: {
-        academy_id: academy.id,
-        OR: orConditions,
-      },
-      include: {
-        location: { select: { name: true } },
-      },
-      take: 5,
-    });
+    const matchingPlayers = orConditions.length > 0
+      ? await prisma.player.findMany({
+          where: {
+            academy_id: academy.id,
+            OR: orConditions,
+          },
+          include: {
+            location: { select: { name: true } },
+          },
+          take: 5,
+        })
+      : [];
 
     if (matchingPlayers.length > 0) {
       const hasMobileMatch = matchingPlayers.some((p) => p.mobile_number === mobileNumber);

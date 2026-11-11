@@ -6,6 +6,18 @@ export function normalizeIndianMobile(value: string): string {
   return value.replace(/\D/g, '').slice(0, 10);
 }
 
+export const PLACEHOLDER_MOBILE_NUMBERS = new Set(['9999999999', '0000000000']);
+
+export function isPlaceholderMobile(mobile?: string | null): boolean {
+  if (!mobile) return true;
+  const cleaned = normalizeIndianMobile(mobile);
+  return (
+    PLACEHOLDER_MOBILE_NUMBERS.has(cleaned) ||
+    /^0{10}$/.test(cleaned) ||
+    /^9{10}$/.test(cleaned)
+  );
+}
+
 export interface ValidationResult {
   isValid: boolean;
   error: string | null;
@@ -38,7 +50,7 @@ export function validateEmail(email: string): ValidationResult {
 
 export function validateMobileNumber(mobile: string): ValidationResult {
   const normalized = normalizeIndianMobile(mobile);
-  if (!INDIAN_MOBILE_REGEX.test(normalized)) {
+  if (!INDIAN_MOBILE_REGEX.test(normalized) || isPlaceholderMobile(normalized)) {
     return {
       isValid: false,
       error: 'Please enter a valid 10-digit Indian mobile number starting with 6, 7, 8, or 9',
