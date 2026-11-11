@@ -94,10 +94,7 @@ export interface SignupInputData {
   locationId: string;
 }
 
-export function validateSignupData(
-  data: SignupInputData,
-  isFromAdmin = false
-): ValidationResult {
+export function validateSignupData(data: SignupInputData): ValidationResult {
   const {
     email,
     password,
@@ -112,15 +109,21 @@ export function validateSignupData(
 
   if (
     !email ||
-    (!password && !isFromAdmin) ||
+    !password ||
     !firstName ||
     !lastName ||
     !mobileNumber ||
+    !role ||
     (role === 'parent' && !guardianName) ||
     !dob ||
     !locationId
   ) {
     return { isValid: false, error: 'Please fill in all required fields' };
+  }
+
+  const normalizedRole = role.trim().toLowerCase();
+  if (normalizedRole !== 'parent' && normalizedRole !== 'player') {
+    return { isValid: false, error: 'Invalid account type selected' };
   }
 
   const firstNameVal = validateName(

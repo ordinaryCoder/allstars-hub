@@ -20,7 +20,8 @@ export async function signup(formData: FormData): Promise<SignupState> {
   const mobileNumber = normalizeIndianMobile(
     formData.get('mobileNumber')?.toString() ?? ''
   );
-  const role = formData.get('role')?.toString() ?? 'parent';
+  const rawRole = formData.get('role')?.toString().trim().toLowerCase() ?? 'parent';
+  const role = rawRole === 'player' ? 'player' : 'parent';
   const guardianName = formData.get('guardianName')?.toString().trim() ?? '';
   const dob = formData.get('dob')?.toString() ?? '';
   const locationId = formData.get('locationId')?.toString() ?? '';
@@ -41,7 +42,7 @@ export async function signup(formData: FormData): Promise<SignupState> {
     locationId,
   };
 
-  const validationResult = validateSignupData(inputData, true);
+  const validationResult = validateSignupData(inputData);
   if (!validationResult.isValid && validationResult.error) {
     return { success: false, error: validationResult.error };
   }

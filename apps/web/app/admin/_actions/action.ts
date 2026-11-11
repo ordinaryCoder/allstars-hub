@@ -847,7 +847,6 @@ export async function addCoachAdmin(formData: FormData): Promise<{ success: fals
     password: password,
     email_confirm: true,
     user_metadata: {
-      isFromAdmin: true,
       role: 'coach',
       first_name: firstName,
       last_name: lastName,
