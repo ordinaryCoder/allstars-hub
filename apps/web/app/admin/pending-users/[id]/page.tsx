@@ -56,18 +56,17 @@ export default async function AdminPendingUserDetailPage({
   return (
     <div className="bg-slate-100 flex justify-center min-h-screen font-sans text-slate-900 antialiased">
       <div className="w-full max-w-[448px] bg-slate-50 min-h-screen pb-28 relative shadow-2xl shadow-slate-200 flex flex-col overflow-x-hidden">
-        <TopAppBar userName={adminName} initials={adminInitials} signOut={signOut} />
+        <TopAppBar
+          title="Pending User"
+          backHref="/admin?tab=users"
+          userName={adminName}
+          initials={adminInitials}
+          signOut={signOut}
+        />
 
         <main className="flex-1 p-4 space-y-4">
-          {/* Back Navigation Bar */}
-          <div className="flex items-center justify-between">
-            <Link
-              href="/admin?tab=users"
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-white border border-slate-200 px-3 py-1.5 rounded-xl shadow-sm transition-all active:scale-95"
-            >
-              <span className="material-symbols-outlined text-[16px]">arrow_back</span>
-              <span>Back to Users</span>
-            </Link>
+          {/* Status Badge */}
+          <div className="flex items-center justify-end">
             <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
               Pending Approval
             </span>

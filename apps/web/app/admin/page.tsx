@@ -38,7 +38,12 @@ export default async function AdminPage({
     <>
       <div className="bg-slate-100 flex justify-center min-h-screen font-sans text-slate-900">
         <div className="w-full max-w-[448px] bg-slate-50 min-h-screen pb-24 relative shadow-2xl shadow-slate-200 flex flex-col overflow-x-hidden">
-          <TopAppBar userName={adminName} initials={adminInitials} signOut={signOut} />
+          <TopAppBar
+            title={tab === 'users' ? 'Users' : 'Home'}
+            userName={adminName}
+            initials={adminInitials}
+            signOut={signOut}
+          />
           
           <main className="flex-1 p-4 space-y-6">
             {tab === 'home' && <HomeTab />}

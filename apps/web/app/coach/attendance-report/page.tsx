@@ -2,6 +2,8 @@ import Link from 'next/link';
 import { prisma } from '@packages/database';
 import { requireRole } from '@/lib/dal';
 import { CoachBottomNav } from '@/components/layout/CoachBottomNav';
+import { TopAppBar } from '@/components/layout/TopAppBar';
+import { signOut } from '@/app/(auth)/_actions/auth';
 import {
   AttendanceReportView,
   RecordedSessionItem,
@@ -13,6 +15,22 @@ export const revalidate = 30;
 
 export default async function AttendanceReportPage() {
   const user = await requireRole('coach');
+
+  const dbUser = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: { first_name: true, last_name: true },
+  });
+
+  const coachName = dbUser?.first_name && dbUser?.last_name
+    ? `${dbUser.first_name} ${dbUser.last_name}`.trim()
+    : user.email?.split('@')[0] || 'Coach';
+
+  const initials = coachName
+    .split(' ')
+    .map((n) => n[0])
+    .join('')
+    .substring(0, 2)
+    .toUpperCase();
 
   const now = new Date();
   const today = new Date(now);
@@ -215,18 +233,12 @@ export default async function AttendanceReportPage() {
       <div className="max-w-[448px] mx-auto min-h-screen bg-slate-50 flex flex-col relative pb-24 shadow-sm border-x border-slate-200/50">
 
         {/* TopAppBar */}
-        <header className="flex items-center justify-between px-4 h-16 w-full sticky top-0 z-50 bg-white border-b border-slate-200 shadow-sm">
-          <div className="flex items-center gap-3">
-            <Link 
-              href="/coach" 
-              aria-label="Go back" 
-              className="flex items-center justify-center w-9 h-9 rounded-full text-slate-900 hover:bg-slate-100 active:scale-95 transition-all"
-            >
-              <span className="material-symbols-outlined text-[22px]">arrow_back</span>
-            </Link>
-            <h1 className="font-bold text-lg tracking-tight text-slate-900">Attendance Report</h1>
-          </div>
-        </header>
+        <TopAppBar
+          title="Attendance Report"
+          userName={coachName}
+          initials={initials}
+          signOut={signOut}
+        />
 
         <main className="px-4 py-6 flex-1">
           <AttendanceReportView
