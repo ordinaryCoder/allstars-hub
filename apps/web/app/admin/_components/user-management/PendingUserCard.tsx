@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useState } from 'react';
 import type { User, PendingConflictCheckResult } from './types';
 import { getPrimaryRole } from './types';
@@ -41,11 +42,19 @@ export function PendingUserCard({ user, onApprove, onConflict }: PendingUserCard
 
   return (
     <div className="bg-white rounded-2xl p-4 shadow-sm border border-amber-200 flex flex-col gap-4 animate-in fade-in duration-300">
-      <div className="flex flex-col gap-1">
+      <Link
+        href={`/admin/pending-users/${user.id}`}
+        className="flex flex-col gap-1 group hover:opacity-95 transition-opacity"
+      >
         <div className="flex justify-between items-center">
-          <span className="text-[14px] font-medium text-slate-900">
-            {user.first_name} {user.last_name}
-          </span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[14px] font-medium text-slate-900 group-hover:text-amber-800 transition-colors">
+              {user.first_name} {user.last_name}
+            </span>
+            <span className="material-symbols-outlined text-[14px] text-slate-300 group-hover:text-amber-600 group-hover:translate-x-0.5 transition-all">
+              arrow_forward_ios
+            </span>
+          </div>
           <span className="text-[12px] font-semibold text-slate-500 px-2 py-0.5 bg-slate-100 rounded-full">
             {getPrimaryRole(user)}
           </span>
@@ -60,7 +69,7 @@ export function PendingUserCard({ user, onApprove, onConflict }: PendingUserCard
             <span className="text-[14px] text-slate-900">{user.mobile_number || 'N/A'}</span>
           </div>
         </div>
-      </div>
+      </Link>
       <div>
         <button
           type="button"

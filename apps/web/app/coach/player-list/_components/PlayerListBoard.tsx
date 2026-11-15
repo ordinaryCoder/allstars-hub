@@ -8,7 +8,7 @@ export interface SerializedPlayer {
   id: string;
   firstName: string;
   lastName: string;
-  dob: string;
+  dob: string | null;
   age: number | null;
   isActive: boolean;
   locationId: string;

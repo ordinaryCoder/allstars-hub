@@ -207,14 +207,14 @@ export interface AdminPlayerInputData {
   lastName: string;
   mobileNumber: string;
   locationId: string;
-  dob: string;
+  dob?: string;
   email?: string;
 }
 
 export function validateAdminPlayerData(data: AdminPlayerInputData): ValidationResult {
   const { firstName, lastName, mobileNumber, locationId, email, dob } = data;
 
-  if (!firstName || !lastName || !mobileNumber || !locationId || !dob) {
+  if (!firstName || !lastName || !mobileNumber || !locationId) {
     return { isValid: false, error: 'Please fill in all required fields' };
   }
 
@@ -231,8 +231,10 @@ export function validateAdminPlayerData(data: AdminPlayerInputData): ValidationR
     return { isValid: false, error: 'Please select a location' };
   }
 
-  const dobVal = validateDob(dob.trim(), 4);
-  if (!dobVal.isValid) return dobVal;
+  if (dob && dob.trim()) {
+    const dobVal = validateDob(dob.trim(), 4);
+    if (!dobVal.isValid) return dobVal;
+  }
 
   if (email && email.trim()) {
     const emailVal = validateEmail(email.trim());

@@ -24,7 +24,7 @@ export interface PlayerRecord {
   id: string; // players.id (UUID)
   first_name: string;
   last_name: string;
-  dob: Date | string;
+  dob?: Date | string | null;
   mobile_number?: string | null;
   email?: string | null;
   is_active: boolean;
@@ -54,7 +54,7 @@ export interface MatchingConflictPlayer {
   last_name: string;
   mobile_number: string;
   email?: string | null;
-  dob: Date | string;
+  dob?: Date | string | null;
   is_active: boolean;
   location?: { id: string; name: string } | null;
   linked_user?: { id: string; first_name: string; last_name: string; email?: string | null } | null;

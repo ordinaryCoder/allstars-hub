@@ -55,7 +55,7 @@ export function AddPlayerModal({ locations, onClose, onSuccess }: AddPlayerModal
       mobileNumber: mobileClean,
       locationId: playerLocationId,
       email: playerEmail.trim() || undefined,
-      dob: dob,
+      dob: dob || undefined,
     });
 
     if (!validation.isValid && validation.error) {
@@ -219,13 +219,16 @@ export function AddPlayerModal({ locations, onClose, onSuccess }: AddPlayerModal
           />
         </div>
 
-        {/* Date of Birth Field (Required) */}
+        {/* Date of Birth Field (Optional) */}
         <div className="flex flex-col gap-1">
+          <div className="flex justify-between items-center">
+            <label className="text-sm font-medium text-slate-900">Date of Birth</label>
+            <span className="text-xs text-slate-400">Optional</span>
+          </div>
           <DobInput
             value={dob}
             onChange={setDob}
-            label="Date of Birth"
-            required={true}
+            required={false}
           />
         </div>
 
