@@ -3,9 +3,6 @@
  * Shared across server actions, validation logic, and admin UI components.
  */
 
-export const DEFAULT_PRESET_PASSWORD =
-  process.env.NEXT_PUBLIC_DEFAULT_PRESET_PASSWORD || 'AllStars@5!';
-
 /**
  * Utility helper to generate a secure random password
  */

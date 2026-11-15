@@ -13,7 +13,7 @@ import {
   normalizeIndianMobile,
   isPlaceholderMobile,
 } from '@/lib/validations/signup';
-import { DEFAULT_PRESET_PASSWORD } from '@/lib/constants/auth';
+import { generateRandomPassword } from '@/lib/constants/auth';
 
 
 function generateTempPassword() {
@@ -815,9 +815,9 @@ export async function addCoachAdmin(formData: FormData): Promise<{ success: fals
   const lastName = formData.get('lastName')?.toString().trim() || '';
   const mobileNumber = normalizeIndianMobile(formData.get('mobileNumber')?.toString() || '');
   const locationId = formData.get('locationId')?.toString().trim() || '';
-  let password = formData.get('password')?.toString() || '';
+  let password = formData.get('password')?.toString().trim() || '';
   if (!password) {
-    password = DEFAULT_PRESET_PASSWORD;
+    password = generateRandomPassword();
   }
 
   const validation = validateCoachData({
