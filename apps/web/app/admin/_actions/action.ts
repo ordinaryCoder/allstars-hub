@@ -7,8 +7,13 @@ import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '@/lib/server';
 import { requireRole } from '@/lib/dal';
 
-import { validateCoachData, validateAdminPlayerData, normalizeIndianMobile } from '@/lib/validations/signup';
-import { DEFAULT_PRESET_PASSWORD } from '@/lib/constants/auth';
+import {
+  validateCoachData,
+  validateAdminPlayerData,
+  normalizeIndianMobile,
+  isPlaceholderMobile,
+} from '@/lib/validations/signup';
+import { generateRandomPassword } from '@/lib/constants/auth';
 
 
 function generateTempPassword() {
@@ -18,7 +23,7 @@ function generateTempPassword() {
 /**
  * Approves a pending user (Admin only).
  */
-async function getPendingUserSignupDetails(userId: string) {
+export async function getPendingUserSignupDetails(userId: string) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     include: { academy_roles: true },
@@ -108,8 +113,8 @@ export async function checkPendingUserConflict(userId: string) {
   }
 
   const orConditions: any[] = [];
-  // 1. Mobile number match across academy
-  if (details.mobileNumber) {
+  // 1. Mobile number match across academy (ignore sentinel/placeholder numbers)
+  if (details.mobileNumber && !isPlaceholderMobile(details.mobileNumber)) {
     orConditions.push({ mobile_number: details.mobileNumber });
   }
 
@@ -698,14 +703,14 @@ export async function addPlayerAdmin(formData: FormData): Promise<AddPlayerAdmin
     mobileNumber,
     locationId,
     email: email || undefined,
-    dob: dobRaw,
+    dob: dobRaw || undefined,
   });
 
   if (!validation.isValid && validation.error) {
     return { success: false, error: validation.error };
   }
 
-  const dob = new Date(dobRaw);
+  const dob = dobRaw ? new Date(dobRaw) : null;
 
   const academy = await prisma.academy.findFirst({
     where: { is_active: true },
@@ -718,21 +723,26 @@ export async function addPlayerAdmin(formData: FormData): Promise<AddPlayerAdmin
 
   // If not explicitly bypassed with allowDuplicate, check if mobile or email already exists in players table
   if (!allowDuplicate) {
-    const orConditions: any[] = [{ mobile_number: mobileNumber }];
+    const orConditions: any[] = [];
+    if (!isPlaceholderMobile(mobileNumber)) {
+      orConditions.push({ mobile_number: mobileNumber });
+    }
     if (email) {
       orConditions.push({ email: { equals: email, mode: 'insensitive' } });
     }
 
-    const matchingPlayers = await prisma.player.findMany({
-      where: {
-        academy_id: academy.id,
-        OR: orConditions,
-      },
-      include: {
-        location: { select: { name: true } },
-      },
-      take: 5,
-    });
+    const matchingPlayers = orConditions.length > 0
+      ? await prisma.player.findMany({
+          where: {
+            academy_id: academy.id,
+            OR: orConditions,
+          },
+          include: {
+            location: { select: { name: true } },
+          },
+          take: 5,
+        })
+      : [];
 
     if (matchingPlayers.length > 0) {
       const hasMobileMatch = matchingPlayers.some((p) => p.mobile_number === mobileNumber);
@@ -805,9 +815,9 @@ export async function addCoachAdmin(formData: FormData): Promise<{ success: fals
   const lastName = formData.get('lastName')?.toString().trim() || '';
   const mobileNumber = normalizeIndianMobile(formData.get('mobileNumber')?.toString() || '');
   const locationId = formData.get('locationId')?.toString().trim() || '';
-  let password = formData.get('password')?.toString() || '';
+  let password = formData.get('password')?.toString().trim() || '';
   if (!password) {
-    password = DEFAULT_PRESET_PASSWORD;
+    password = generateRandomPassword();
   }
 
   const validation = validateCoachData({
@@ -847,7 +857,6 @@ export async function addCoachAdmin(formData: FormData): Promise<{ success: fals
     password: password,
     email_confirm: true,
     user_metadata: {
-      isFromAdmin: true,
       role: 'coach',
       first_name: firstName,
       last_name: lastName,
@@ -1038,3 +1047,270 @@ export async function reactivatePlayerById(
     return { success: false, error: error?.message || 'Failed to reactivate player' };
   }
 }
+export interface PlayerDetailAdminResult {
+  player: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    dob: Date | null;
+    mobile_number: string;
+    email: string | null;
+    is_active: boolean;
+    location: { id: string; name: string; address?: string | null } | null;
+    batches: Array<{
+      id: string;
+      name: string;
+      sport: { name: string };
+    }>;
+    attendance: Array<{
+      id: string;
+      status: string;
+      marked_at: Date;
+      session: {
+        id: string;
+        start_time: Date;
+        coach: { first_name: string; last_name: string } | null;
+      };
+    }>;
+    linked_user: {
+      id: string;
+      first_name: string;
+      last_name: string;
+      email: string | null;
+      mobile_number: string | null;
+      status: string;
+    } | null;
+    parents: Array<{
+      id: string;
+      first_name: string;
+      last_name: string;
+      email: string | null;
+      mobile_number: string | null;
+      status: string;
+    }>;
+  };
+}
+
+export type UpdatePlayerAdminResult =
+  | { success: true; playerName: string }
+  | {
+      success: false;
+      hasConflict: true;
+      conflictType: 'mobile' | 'email' | 'both';
+      existingPlayers: ExistingPlayerConflict[];
+      error: string;
+    }
+  | { success: false; hasConflict?: false; error: string };
+
+export async function updatePlayerAdmin(
+  playerId: string,
+  formData: FormData,
+): Promise<UpdatePlayerAdminResult> {
+  await requireRole('admin');
+
+  const firstName = formData.get('firstName')?.toString().trim() || '';
+  const lastName = formData.get('lastName')?.toString().trim() || '';
+  const mobileNumber = normalizeIndianMobile(formData.get('mobileNumber')?.toString() || '');
+  const locationId = formData.get('locationId')?.toString().trim() || '';
+  const emailRaw = formData.get('email')?.toString().trim() || '';
+  const email = emailRaw ? emailRaw.toLowerCase() : null;
+  const dobRaw = formData.get('dob')?.toString().trim() || '';
+  const allowDuplicate = formData.get('allowDuplicate')?.toString() === 'true';
+
+  const validation = validateAdminPlayerData({
+    firstName,
+    lastName,
+    mobileNumber,
+    locationId,
+    email: email || undefined,
+    dob: dobRaw || undefined,
+  });
+
+  if (!validation.isValid && validation.error) {
+    return { success: false, error: validation.error };
+  }
+
+  const dob = dobRaw ? new Date(dobRaw) : null;
+
+  const academy = await prisma.academy.findFirst({
+    where: { is_active: true },
+    select: { id: true },
+  });
+
+  if (!academy) {
+    return { success: false, error: 'No active academy available' };
+  }
+
+  if (!allowDuplicate) {
+    const orConditions: any[] = [];
+    if (!isPlaceholderMobile(mobileNumber)) {
+      orConditions.push({ mobile_number: mobileNumber });
+    }
+    if (email) {
+      orConditions.push({ email: { equals: email, mode: 'insensitive' } });
+    }
+
+    const matchingPlayers =
+      orConditions.length > 0
+        ? await prisma.player.findMany({
+            where: {
+              academy_id: academy.id,
+              id: { not: playerId }, // exclude self
+              OR: orConditions,
+            },
+            include: {
+              location: { select: { name: true } },
+            },
+            take: 5,
+          })
+        : [];
+
+    if (matchingPlayers.length > 0) {
+      const hasMobileMatch = matchingPlayers.some((p) => p.mobile_number === mobileNumber);
+      const hasEmailMatch = !!email && matchingPlayers.some((p) => p.email?.toLowerCase() === email);
+
+      const conflictType: 'mobile' | 'email' | 'both' =
+        hasMobileMatch && hasEmailMatch ? 'both' : hasMobileMatch ? 'mobile' : 'email';
+
+      const conflictPlayers: ExistingPlayerConflict[] = matchingPlayers.map((p) => ({
+        id: p.id,
+        first_name: p.first_name,
+        last_name: p.last_name,
+        mobile_number: p.mobile_number,
+        email: p.email,
+        locationName: p.location?.name || 'Unknown',
+      }));
+
+      const desc =
+        conflictType === 'both'
+          ? 'Mobile number and email address are already registered to another player.'
+          : conflictType === 'mobile'
+          ? `Mobile number (+91 ${mobileNumber}) is already registered to another player.`
+          : `Email (${email}) is already registered to another player.`;
+
+      return {
+        success: false,
+        hasConflict: true,
+        conflictType,
+        existingPlayers: conflictPlayers,
+        error: desc,
+      };
+    }
+  }
+
+  try {
+    const updated = await prisma.player.update({
+      where: { id: playerId },
+      data: {
+        first_name: firstName,
+        last_name: lastName,
+        mobile_number: mobileNumber,
+        email,
+        dob,
+        location_id: locationId,
+      },
+      select: { first_name: true, last_name: true },
+    });
+
+    revalidatePath(`/admin/players/${playerId}`);
+    revalidatePath('/admin');
+    revalidatePath('/coach/player-list');
+    revalidatePath('/coach/new-session');
+    revalidatePath('/coach/attendance-report');
+    revalidateTag('player-counts', 'default');
+    revalidateTag('coach-player-list', 'default');
+    revalidateTag('user-profiles', 'default');
+
+    return { success: true, playerName: `${updated.first_name} ${updated.last_name}`.trim() };
+  } catch (error: any) {
+    console.error('Error updating player:', error);
+    return { success: false, error: error?.message || 'Failed to update player' };
+  }
+}
+
+export async function getPlayerDetailAdmin(playerId: string): Promise<PlayerDetailAdminResult | null> {
+  await requireRole('admin');
+
+  const p = await prisma.player.findUnique({
+    where: { id: playerId },
+    include: {
+      location: true,
+      batches: {
+        include: {
+          batch: {
+            include: { sport: true },
+          },
+        },
+      },
+      attendance: {
+        take: 20,
+        orderBy: { marked_at: 'desc' },
+        include: {
+          session: {
+            include: {
+              coach: {
+                select: { first_name: true, last_name: true },
+              },
+            },
+          },
+        },
+      },
+      user: {
+        select: {
+          id: true,
+          first_name: true,
+          last_name: true,
+          email: true,
+          mobile_number: true,
+          status: true,
+        },
+      },
+      parents: {
+        include: {
+          parent: {
+            select: {
+              id: true,
+              first_name: true,
+              last_name: true,
+              email: true,
+              mobile_number: true,
+              status: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!p) return null;
+
+  return {
+    player: {
+      id: p.id,
+      first_name: p.first_name,
+      last_name: p.last_name,
+      dob: p.dob,
+      mobile_number: p.mobile_number,
+      email: p.email,
+      is_active: p.is_active,
+      location: p.location,
+      batches: p.batches.map((pb) => ({
+        id: pb.batch.id,
+        name: pb.batch.name,
+        sport: { name: pb.batch.sport?.name || 'Sport' },
+      })),
+      attendance: p.attendance.map((a) => ({
+        id: a.id,
+        status: a.status,
+        marked_at: a.marked_at,
+        session: {
+          id: a.session.id,
+          start_time: a.session.start_time,
+          coach: a.session.coach,
+        },
+      })),
+      linked_user: p.user,
+      parents: p.parents.map((pp) => pp.parent),
+    },
+  };
+}

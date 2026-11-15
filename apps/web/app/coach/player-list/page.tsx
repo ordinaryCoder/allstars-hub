@@ -1,30 +1,42 @@
 import { requireRole } from '@/lib/dal';
 import { getCoachPlayersListCached } from '@/lib/cached-queries';
 import { CoachBottomNav } from '@/components/layout/CoachBottomNav';
+import { TopAppBar } from '@/components/layout/TopAppBar';
+import { signOut } from '@/app/(auth)/_actions/auth';
+import { prisma } from '@packages/database';
 import { PlayerListBoard, SerializedPlayer, SerializedLocation } from './_components/PlayerListBoard';
 
 export default async function CoachPlayersListPage() {
   const user = await requireRole('coach');
 
-  const { locations, players } = await getCoachPlayersListCached(user.id);
+  const [dbUser, { locations, players }] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: user.id },
+      select: { first_name: true, last_name: true },
+    }),
+    getCoachPlayersListCached(user.id),
+  ]);
+
+  const coachName = dbUser?.first_name && dbUser?.last_name
+    ? `${dbUser.first_name} ${dbUser.last_name}`.trim()
+    : user.email?.split('@')[0] || 'Coach';
+
+  const initials = coachName
+    .split(' ')
+    .map((n) => n[0])
+    .join('')
+    .substring(0, 2)
+    .toUpperCase();
 
   return (
     <div className="bg-slate-50 text-slate-900 antialiased min-h-screen font-sans">
       <div className="max-w-[448px] mx-auto min-h-screen bg-slate-50 flex flex-col relative pb-24">
-        {/* Header */}
-        <header className="flex justify-between items-center w-full px-4 h-16 sticky top-0 z-50 bg-white shadow-sm border-b border-slate-200">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold text-sm">
-              <span className="material-symbols-outlined text-[20px]">groups</span>
-            </div>
-            <div className="flex flex-col">
-              <h1 className="font-bold text-base text-slate-900">Location Players</h1>
-              <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">
-                {locations.length} {locations.length === 1 ? 'Location' : 'Locations'} Assigned
-              </span>
-            </div>
-          </div>
-        </header>
+        <TopAppBar
+          title="Location Players"
+          userName={coachName}
+          initials={initials}
+          signOut={signOut}
+        />
 
         {/* Content */}
         <main className="flex-1 px-4 py-6">

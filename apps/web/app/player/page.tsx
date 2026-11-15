@@ -52,7 +52,12 @@ export default async function PlayerPage({
       <>
         <div className="bg-slate-100 flex justify-center min-h-screen font-sans text-slate-900 antialiased">
           <div className="w-full max-w-[448px] bg-slate-50 min-h-screen pb-24 relative shadow-2xl shadow-slate-200 flex flex-col overflow-x-hidden">
-            <TopAppBar userName={userName} initials={initials} signOut={signOut} />
+            <TopAppBar
+              title="Home"
+              userName={userName}
+              initials={initials}
+              signOut={signOut}
+            />
             <main className="flex-1 px-4 py-6 flex flex-col gap-6 items-center justify-center">
               <p className="text-slate-500 text-sm text-center">No player profile found for your account.</p>
             </main>
@@ -145,7 +150,12 @@ export default async function PlayerPage({
     <>
       <div className="bg-slate-100 flex justify-center min-h-screen font-sans text-slate-900 antialiased">
         <div className="w-full max-w-[448px] bg-slate-50 min-h-screen pb-24 relative shadow-2xl shadow-slate-200 flex flex-col overflow-x-hidden">
-          <TopAppBar userName={userName} initials={initials} signOut={signOut} />
+          <TopAppBar
+            title="Home"
+            userName={userName}
+            initials={initials}
+            signOut={signOut}
+          />
 
           {/* Parent player switcher — rendered when parent has >1 child */}
           {switcherPlayers.length > 1 && (

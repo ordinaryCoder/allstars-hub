@@ -6,6 +6,18 @@ export function normalizeIndianMobile(value: string): string {
   return value.replace(/\D/g, '').slice(0, 10);
 }
 
+export const PLACEHOLDER_MOBILE_NUMBERS = new Set(['9999999999', '0000000000']);
+
+export function isPlaceholderMobile(mobile?: string | null): boolean {
+  if (!mobile) return true;
+  const cleaned = normalizeIndianMobile(mobile);
+  return (
+    PLACEHOLDER_MOBILE_NUMBERS.has(cleaned) ||
+    /^0{10}$/.test(cleaned) ||
+    /^9{10}$/.test(cleaned)
+  );
+}
+
 export interface ValidationResult {
   isValid: boolean;
   error: string | null;
@@ -38,7 +50,7 @@ export function validateEmail(email: string): ValidationResult {
 
 export function validateMobileNumber(mobile: string): ValidationResult {
   const normalized = normalizeIndianMobile(mobile);
-  if (!INDIAN_MOBILE_REGEX.test(normalized)) {
+  if (!INDIAN_MOBILE_REGEX.test(normalized) || isPlaceholderMobile(normalized)) {
     return {
       isValid: false,
       error: 'Please enter a valid 10-digit Indian mobile number starting with 6, 7, 8, or 9',
@@ -94,10 +106,7 @@ export interface SignupInputData {
   locationId: string;
 }
 
-export function validateSignupData(
-  data: SignupInputData,
-  isFromAdmin = false
-): ValidationResult {
+export function validateSignupData(data: SignupInputData): ValidationResult {
   const {
     email,
     password,
@@ -112,15 +121,21 @@ export function validateSignupData(
 
   if (
     !email ||
-    (!password && !isFromAdmin) ||
+    !password ||
     !firstName ||
     !lastName ||
     !mobileNumber ||
+    !role ||
     (role === 'parent' && !guardianName) ||
     !dob ||
     !locationId
   ) {
     return { isValid: false, error: 'Please fill in all required fields' };
+  }
+
+  const normalizedRole = role.trim().toLowerCase();
+  if (normalizedRole !== 'parent' && normalizedRole !== 'player') {
+    return { isValid: false, error: 'Invalid account type selected' };
   }
 
   const firstNameVal = validateName(
@@ -192,14 +207,14 @@ export interface AdminPlayerInputData {
   lastName: string;
   mobileNumber: string;
   locationId: string;
-  dob: string;
+  dob?: string;
   email?: string;
 }
 
 export function validateAdminPlayerData(data: AdminPlayerInputData): ValidationResult {
   const { firstName, lastName, mobileNumber, locationId, email, dob } = data;
 
-  if (!firstName || !lastName || !mobileNumber || !locationId || !dob) {
+  if (!firstName || !lastName || !mobileNumber || !locationId) {
     return { isValid: false, error: 'Please fill in all required fields' };
   }
 
@@ -216,8 +231,10 @@ export function validateAdminPlayerData(data: AdminPlayerInputData): ValidationR
     return { isValid: false, error: 'Please select a location' };
   }
 
-  const dobVal = validateDob(dob.trim(), 4);
-  if (!dobVal.isValid) return dobVal;
+  if (dob && dob.trim()) {
+    const dobVal = validateDob(dob.trim(), 4);
+    if (!dobVal.isValid) return dobVal;
+  }
 
   if (email && email.trim()) {
     const emailVal = validateEmail(email.trim());

@@ -90,7 +90,7 @@ export async function getCoachPlayersListCached(coachUserId: string) {
           id: p.id,
           firstName: p.first_name,
           lastName: p.last_name,
-          dob: p.dob.toISOString(),
+          dob: p.dob ? p.dob.toISOString() : null,
           age,
           isActive: p.is_active,
           locationId: p.location_id,

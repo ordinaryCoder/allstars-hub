@@ -10,7 +10,6 @@ import {
   type CoachInputData,
 } from '@/lib/validations/signup';
 import {
-  DEFAULT_PRESET_PASSWORD,
   generateRandomPassword,
 } from '@/lib/constants/auth';
 import type { CreatedCredentials } from './CredentialSuccessModal';
@@ -28,7 +27,7 @@ export function AddCoachModal({ locations, onSuccess }: AddCoachModalProps) {
   const [coachMobile, setCoachMobile] = useState('');
   const [coachLocationId, setCoachLocationId] = useState('');
 
-  const [customPassword, setCustomPassword] = useState(DEFAULT_PRESET_PASSWORD);
+  const [customPassword, setCustomPassword] = useState(() => generateRandomPassword());
   const [showPasswordText, setShowPasswordText] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -59,7 +58,7 @@ export function AddCoachModal({ locations, onSuccess }: AddCoachModalProps) {
     formData.set('lastName', coachData.lastName);
     formData.set('mobileNumber', coachData.mobileNumber);
     formData.set('locationId', coachData.locationId);
-    formData.set('password', customPassword.trim() || DEFAULT_PRESET_PASSWORD);
+    formData.set('password', customPassword.trim() || generateRandomPassword());
 
     startTransition(async () => {
       const res = await addCoachAdmin(formData);
@@ -197,7 +196,7 @@ export function AddCoachModal({ locations, onSuccess }: AddCoachModalProps) {
               type={showPasswordText ? 'text' : 'password'}
               value={customPassword}
               onChange={(e) => setCustomPassword(e.target.value)}
-              placeholder={DEFAULT_PRESET_PASSWORD}
+              placeholder="Generated password"
               className="w-full h-12 pl-4 pr-10 bg-white border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-slate-900 outline-none font-mono"
             />
             <button
@@ -211,11 +210,7 @@ export function AddCoachModal({ locations, onSuccess }: AddCoachModalProps) {
             </button>
           </div>
           <p className="text-[11px] text-slate-500">
-            Defaulted to{' '}
-            <code className="bg-slate-100 px-1 py-0.5 rounded font-bold text-slate-800">
-              {DEFAULT_PRESET_PASSWORD}
-            </code>
-            . You can edit it manually or click Generate Random.
+            Auto-generated secure password. You can edit it manually or click Generate Random.
           </p>
         </div>
 

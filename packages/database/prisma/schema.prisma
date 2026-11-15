@@ -119,7 +119,7 @@ model Player {
   last_name     String
   mobile_number String    // Primary phone for matching & communication
   email         String?   // Optional email
-  dob           DateTime  @db.Date
+  dob           DateTime? @db.Date
   is_active     Boolean   @default(true)
 
   user       User?          @relation("UserPlayers", fields: [user_id], references: [id])

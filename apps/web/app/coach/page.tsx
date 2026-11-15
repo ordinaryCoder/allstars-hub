@@ -8,7 +8,21 @@ import { CoachBottomNav } from '@/components/layout/CoachBottomNav';
 export default async function DashboardPage() {
   const user = await requireRole('coach');
 
-  const userName = user.email?.split('@')[0] || 'Coach';
+  const dbUser = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: { first_name: true, last_name: true },
+  });
+
+  const coachName = dbUser?.first_name && dbUser?.last_name
+    ? `${dbUser.first_name} ${dbUser.last_name}`.trim()
+    : user.email?.split('@')[0] || 'Coach';
+
+  const initials = coachName
+    .split(' ')
+    .map((n) => n[0])
+    .join('')
+    .substring(0, 2)
+    .toUpperCase();
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -50,7 +64,12 @@ export default async function DashboardPage() {
     <>
       <div className="bg-slate-50 text-slate-900 antialiased min-h-screen font-sans">
         <div className="max-w-[448px] mx-auto min-h-screen bg-slate-50 flex flex-col relative pb-24">
-          <TopAppBar userName={userName} signOut={signOut} />
+          <TopAppBar
+            title="Home"
+            userName={coachName}
+            initials={initials}
+            signOut={signOut}
+          />
           
           <main className="flex-1 px-4 py-6 flex flex-col gap-6">
             <CreateSessionCard futureSessionsCount={futureSessionsCount} />

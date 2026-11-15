@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import type { PlayerRecord } from './types';
 import { Tooltip } from '@/components/ui/Tooltip';
 
@@ -54,63 +55,74 @@ export function PlayerRecordCard({
           : 'bg-slate-50 border-slate-200'
       }`}
     >
-      {/* Avatar */}
-      <div
-        className={`w-11 h-11 rounded-full shadow-sm flex-shrink-0 flex items-center justify-center font-bold border text-sm uppercase mr-3 ${
-          isInactive
-            ? 'bg-slate-200 text-slate-400 border-slate-300'
-            : 'bg-white text-slate-500 border-slate-200'
-        }`}
+      {/* Clickable Info Area leading to Player Detail Page */}
+      <Link
+        href={`/admin/players/${player.id}`}
+        className="flex-1 flex items-center min-w-0 group hover:opacity-90 transition-opacity"
       >
-        {initials}
-      </div>
-
-      {/* Main info */}
-      <div className="flex-1 flex flex-col justify-center gap-0.5 min-w-0">
-        <span className="text-[14px] font-semibold text-slate-900 truncate">
-          {player.first_name} {player.last_name}
-        </span>
-
-        {/* Location pill + age + mobile */}
-        <div className="flex items-center gap-2 flex-wrap">
-          {player.location?.name && (
-            <span className="inline-flex items-center gap-0.5 text-[11px] font-medium text-slate-500">
-              <span className="material-symbols-outlined text-[13px] text-slate-400">
-                location_on
-              </span>
-              {player.location.name}
-            </span>
-          )}
-          {player.mobile_number && (
-            <span className="inline-flex items-center gap-0.5 text-[11px] font-medium text-slate-500">
-              <span className="material-symbols-outlined text-[13px] text-slate-400">
-                call
-              </span>
-              +91 {player.mobile_number}
-            </span>
-          )}
-          {player.dob && (
-            <span className="text-[11px] font-medium text-slate-400">
-              · {formatAge(player.dob)}
-            </span>
-          )}
+        {/* Avatar */}
+        <div
+          className={`w-11 h-11 rounded-full shadow-sm flex-shrink-0 flex items-center justify-center font-bold border text-sm uppercase mr-3 ${
+            isInactive
+              ? 'bg-slate-200 text-slate-400 border-slate-300'
+              : 'bg-white text-slate-500 border-slate-200'
+          }`}
+        >
+          {initials}
         </div>
 
-        {/* Account linkage (parent / self-login) */}
-        {linkageLabel && linkageIcon && (
-          <div className="flex items-center gap-1 mt-0.5">
-            <span className="material-symbols-outlined text-[13px] text-slate-300">
-              {linkageIcon}
+        {/* Main info */}
+        <div className="flex-1 flex flex-col justify-center gap-0.5 min-w-0">
+          <div className="flex items-center gap-1.5">
+            <span className="text-[14px] font-semibold text-slate-900 group-hover:text-indigo-600 transition-colors truncate">
+              {player.first_name} {player.last_name}
             </span>
-            <span
-              className="text-[11px] text-slate-400 truncate"
-              title={linkageLabel}
-            >
-              {linkageLabel}
+            <span className="material-symbols-outlined text-[14px] text-slate-300 group-hover:text-indigo-500 group-hover:translate-x-0.5 transition-all">
+              arrow_forward_ios
             </span>
           </div>
-        )}
-      </div>
+
+          {/* Location pill + age + mobile */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {player.location?.name && (
+              <span className="inline-flex items-center gap-0.5 text-[11px] font-medium text-slate-500">
+                <span className="material-symbols-outlined text-[13px] text-slate-400">
+                  location_on
+                </span>
+                {player.location.name}
+              </span>
+            )}
+            {player.mobile_number && (
+              <span className="inline-flex items-center gap-0.5 text-[11px] font-medium text-slate-500">
+                <span className="material-symbols-outlined text-[13px] text-slate-400">
+                  call
+                </span>
+                +91 {player.mobile_number}
+              </span>
+            )}
+            {player.dob && (
+              <span className="text-[11px] font-medium text-slate-400">
+                · {formatAge(player.dob)}
+              </span>
+            )}
+          </div>
+
+          {/* Account linkage (parent / self-login) */}
+          {linkageLabel && linkageIcon && (
+            <div className="flex items-center gap-1 mt-0.5">
+              <span className="material-symbols-outlined text-[13px] text-slate-300">
+                {linkageIcon}
+              </span>
+              <span
+                className="text-[11px] text-slate-400 truncate"
+                title={linkageLabel}
+              >
+                {linkageLabel}
+              </span>
+            </div>
+          )}
+        </div>
+      </Link>
 
       {/* Right actions */}
       <div className="flex flex-col items-end justify-center gap-1 flex-shrink-0 ml-3">

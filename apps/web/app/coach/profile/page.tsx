@@ -2,6 +2,7 @@ import { requireRole } from '@/lib/dal';
 import { getUserProfileDataCached } from '@/lib/cached-queries';
 import { signOut } from '@/app/(auth)/_actions/auth';
 import { CoachBottomNav } from '@/components/layout/CoachBottomNav';
+import { TopAppBar } from '@/components/layout/TopAppBar';
 import { ACADEMY_NAME } from '@/lib/constant';
 import { ChangePasswordButton } from '@/components/ui/ChangePasswordButton';
 
@@ -34,21 +35,12 @@ export default async function CoachProfilePage() {
     <div className="bg-slate-50 text-slate-900 antialiased min-h-screen font-sans">
       <div className="max-w-[448px] mx-auto min-h-screen bg-slate-50 flex flex-col relative pb-24 shadow-sm border-x border-slate-200/50">
         {/* Header */}
-        <header className="flex justify-between items-center w-full px-4 h-16 sticky top-0 z-50 bg-white shadow-sm border-b border-slate-200">
-          <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-slate-700 text-[24px]">account_circle</span>
-            <h1 className="font-bold text-lg text-slate-900">Coach Profile</h1>
-          </div>
-          <form action={signOut}>
-            <button
-              type="submit"
-              className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-full transition-colors active:scale-95 flex items-center justify-center"
-              title="Sign Out"
-            >
-              <span className="material-symbols-outlined text-[20px]">logout</span>
-            </button>
-          </form>
-        </header>
+        <TopAppBar
+          title="Coach Profile"
+          userName={coachName}
+          initials={initials}
+          signOut={signOut}
+        />
 
         {/* Content */}
         <main className="flex-1 px-4 py-6 flex flex-col gap-6">
